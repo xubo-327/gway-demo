@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+<head><script src="../../demo/inject.js"></script>
+<meta charset="utf-8">
+<title>Ticket</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  /* 演示用：显示模拟打印机最新打出来的票（票面用收银系统自己的 renderTicket 排版；静态版的票由浏览器里的假服务器排好） */
+  body { background: #3a3733; margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 24px; gap: 16px; }
+  .bar { color: #e9e6df; font-size: 15px; display: flex; gap: 12px; align-items: center; }
+  .bar b { color: #fff; }
+  .paper { background: #fff; padding: 18px 16px 28px; box-shadow: 0 16px 30px -12px rgba(0,0,0,.5); width: 420px; max-width: 100%;
+    -webkit-mask: linear-gradient(#000 0 0) top/100% calc(100% - 10px) no-repeat, radial-gradient(circle at 8px 100%, transparent 7px, #000 7.5px) bottom/16px 10px repeat-x; }
+  .empty { color: #c9c3b8; margin-top: 30vh; font-size: 18px; }
+</style>
+</head>
+<body>
+<div class="bar"><b id="title"></b><span id="when"></span></div>
+<div id="out"><div class="empty" id="empty"></div></div>
+<script src="i18n.js"></script>
+<script src="common.js"></script>
+<script>
+(function () {
+  // 语言跟外壳的语言按钮走（外壳加载时带 ?lang=zh|fr）
+  var zh = (/[?&]lang=(zh|fr)/.exec(location.search) || [])[1] !== "fr";
+  document.documentElement.lang = zh ? "zh-CN" : "fr";
+  var L = zh ? { title: "模拟打印机", empty: "还没有打印小票", at: "打印于" } : { title: "Imprimante simulée", empty: "Aucun ticket imprimé pour l'instant", at: "imprimé à" };
+  document.getElementById("title").textContent = L.title;
+  document.getElementById("empty").textContent = L.empty;
+  var last = 0;
+  function tick() {
+    api("/api/print-jobs?limit=6").then(function (r) {
+      var jobs = (r.jobs || []).filter(function (j) { return j.kind !== "kitchen"; });
+      if (!jobs.length || jobs[0].id === last) return;
+      last = jobs[0].id;
+      return api("/api/print-jobs/" + jobs[0].id).then(function (job) {
+        document.getElementById("out").innerHTML = '<div class="paper">' + renderTicket(job.payload) + "</div>";
+        document.getElementById("when").textContent = L.at + " " + String(job.created_at || "").slice(11, 16);
+      });
+    }).catch(function () {});
+  }
+  tick(); setInterval(tick, 2000);
+})();
+</script>
+</body>
+</html>

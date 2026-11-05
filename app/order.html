@@ -1,0 +1,2896 @@
+<!doctype html>
+<html lang="zh-CN" class="no-keypad"><!-- 手机点餐页：点输入框直接用手机自带的输入法，不用收银台的屏幕键盘 -->
+<head><script src="../../demo/inject.js"></script>
+<meta charset="utf-8">
+<script src="compat.js"></script>
+<script src="theme.js"></script>
+<script src="store-theme.js"></script>
+<script>if (new URLSearchParams(location.search).get("t")) StoreTheme.mount(); // 顾客页（扫码、网上商城、点餐机）才用点餐页主题，服务员点单页照旧</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>点餐</title>
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  /* ===== 顾客点餐页（v1.24 重新设计）：手机优先；颜色跟店里的「系统颜色」（--accent）；间距 4/8/12/16/24 ===== */
+  body { background: #fff; background-image: none; }
+  #app { min-height: 100vh; display: flex; flex-direction: column; }
+  .ic { width: 1em; height: 1em; flex: none; display: inline-block; vertical-align: -.125em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  #app button:focus-visible, #app a:focus-visible, .sheet button:focus-visible, .lang-float button:focus-visible, .opt-panel button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+  /* 右上角语言按钮是浮在顶栏上的：顶栏右边按它的真实宽度留空（--langw 由脚本量；双语「FR+中」比单语宽，以前固定 84px，外带胶囊被压住，v1.42.13） */
+  .head { padding-right: calc(var(--langw, 72px) + 20px) !important; }
+  .lang-float { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); right: 12px; z-index: 30; }
+  .lang-float .i18n-switch { height: 44px; min-width: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 0; background: rgba(255,255,255,.96); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .head { position: sticky; top: 0; z-index: 5; background: var(--accent); background-image: var(--pattern-light, none); color: var(--on-accent); min-height: 64px; padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px; display: flex; align-items: center; gap: 10px; }
+  .head h1 { font-size: 18px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -.01em; }
+  /* 窄手机（320 宽）：店名可以占两行、字小一点，不被截成「Resta…」（测试总 T5） */
+  @media (max-width: 360px) { .head h1 { font-size: 15px; line-height: 1.2; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; } }
+  .head .tno { background: rgba(255,255,255,.16); border-radius: 99px; padding: 4px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .head button { background: rgba(255,255,255,.18); color: inherit; border: 0; border-radius: 10px; padding: 8px 12px; min-height: 44px; }
+  /* 双语（设计梳理 O2，v1.42.13）：店名只占一行（中文名 + 小字译名接在后面，放不下用「…」，不再硬截成「Restaurant de dé」）；
+     「外带自提」胶囊两种语言上下两行、字小一点，不和右边的语言按钮抢位置 */
+  .head .tno { flex: 0 1 auto; min-width: 0; }
+  html.i18n-dual .head h1 { display: flex; align-items: baseline; }
+  html.i18n-dual .head h1 .i18n-2 { display: block; flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78em; font-weight: 600; opacity: .85; margin-left: .45em; }
+  html.i18n-dual .head .tno { white-space: normal; line-height: 1.15; text-align: center; padding: 3px 10px; font-size: 12px; max-width: 46%; }
+  html.i18n-dual .head .tno .i18n-2 { display: block; margin: 1px 0 0; font-size: 11px; }
+
+  .menu { flex: 1; display: grid; grid-template-columns: 96px minmax(0, 1fr); min-height: 0; }
+  /* 高度按「真正看得见的高度」（--app-h，手机浏览器工具栏不算），再减掉底部「选好了」那条，最后一个分类（如啤酒）不会被挡住 */
+  .cats { background: var(--surface-2); overflow-y: auto; position: sticky; top: var(--menu-top, 100px); height: calc(var(--app-h, 100vh) - var(--menu-top, 100px) - 84px - env(safe-area-inset-bottom, 0px)); scroll-behavior: smooth; padding-bottom: 12px; box-sizing: border-box; scrollbar-width: none; }
+  .cats::-webkit-scrollbar { display: none; }
+  .search-bar { position: sticky; top: var(--head-h, 52px); z-index: 4; background: #fff; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); display: flex; gap: 4px; align-items: center; }
+  .search-bar input { flex: 1; min-width: 0; height: 44px; border: 1px solid transparent; background: #f3f2ef url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a746a' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 14px 50% / 18px; border-radius: 22px; padding: 0 14px 0 40px; font-size: 15px; outline: none; transition: border-color .15s, background-color .15s; }
+  .search-bar input:focus { background-color: #fff; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .search-bar button { border: 0; background: none; width: 44px; height: 44px; border-radius: 50%; font-size: 24px; line-height: 1; color: var(--muted); padding: 0; flex: none; }
+  .search-bar input::-webkit-search-cancel-button { display: none; }
+  .stepper { flex-shrink: 0; }
+  .spec { white-space: nowrap; }
+  .search-hint { font-size: 13px; color: var(--muted); padding: 16px 0 4px; }
+  .menu.searching .cats button.on { background: none; font-weight: 400; }
+  .menu.searching .cats button.on::before { display: none; }
+  .banner { position: relative; background: #f4f2ee; }
+  .bn-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .bn-track::-webkit-scrollbar { display: none; }
+  .bn-track img { flex: 0 0 100%; width: 100%; aspect-ratio: 3 / 1; object-fit: cover; scroll-snap-align: start; display: block; user-select: none; }
+  .bn-dots { position: absolute; left: 0; right: 0; bottom: 6px; display: flex; justify-content: center; gap: 5px; pointer-events: none; }
+  .bn-dots span { width: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.6); transition: width .2s; }
+  .bn-dots span.on { width: 16px; background: #fff; }
+  @media (min-width: 700px) { .bn-track img { aspect-ratio: 4 / 1; } }
+  .closed-page, .guests-page { min-height: 100vh; background: #faf8f4; }
+  .gp-card { margin: 18px 16px; padding: 22px 16px; background: #fff; border-radius: 18px; text-align: center; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
+  .gp-card h2 { margin: 0 0 16px; font-size: 20px; }
+  .gp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .gp-grid button { border: 2px solid var(--line); background: #fff; border-radius: 14px; padding: 14px 0; font-size: 24px; font-weight: 700; color: var(--text); }
+  .gp-grid button:active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .gp-more { display: flex; gap: 8px; margin-top: 14px; }
+  .gp-more input { flex: 1; font-size: 17px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+  .cl-card { margin: 18px 16px; padding: 26px 20px; background: #fff; border-radius: 18px; text-align: center; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
+  .cl-icon { display: inline-grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-text); font-size: 34px; line-height: 1; }
+  .cl-card h2 { margin: 12px 0 6px; font-size: 22px; }
+  .cl-sub { color: var(--muted); margin: 0 0 8px; }
+  .cl-msg { margin: 12px 0; padding: 12px 14px; background: var(--accent-soft); color: var(--accent); border-radius: 12px; font-weight: 600; white-space: pre-line; line-height: 1.6; }
+  .cl-hours { margin: 8px 0; }
+  .cl-week { margin: 10px auto; border-collapse: collapse; font-size: 14px; }
+  .cl-week td { padding: 4px 12px; text-align: left; }
+  .cl-week tr.today td { background: var(--accent-soft); color: var(--accent); font-weight: 700; border-radius: 6px; }
+  .cl-hours a { color: var(--accent); }
+  /* 打烊 / 暂停网上接单（店主 10-26「打烊时能看不能下单」）：菜单照常看，顶部一条提示，加菜和结账变灰 */
+  .closed-bar { display: flex; gap: 10px; align-items: flex-start; margin: 10px 12px 0; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft); color: var(--accent-text); line-height: 1.5; }
+  .closed-bar > .ic { flex-shrink: 0; font-size: 22px; margin-top: 2px; }
+  .closed-bar b { display: block; font-size: 16px; }
+  .closed-bar span { display: block; font-size: 13.5px; }
+  .closed-bar .cb-msg { margin-top: 4px; font-weight: 600; white-space: pre-line; }
+  .closed-bar a { color: inherit; }
+  .is-closed .stepper .plus, .is-closed .stepper .spec, .is-closed .pd-add { opacity: .35; }
+  .cl-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+  .dish .code { display: inline-block; min-width: 26px; margin-right: 6px; padding: 0 5px; border-radius: 6px; background: #f1efeb; color: #5f5a52; font-size: 12px; font-weight: 700; text-align: center; vertical-align: 1px; }
+  /* 下一类：整行按钮，左边小字「下一类」，右边分类名 + 箭头 */
+  .next-cat { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 52px; margin: 16px 0 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--text); font-size: 15px; font-weight: 600; text-align: left; cursor: pointer; }
+  .next-cat > span:first-child { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .next-cat .nc-name { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-text); }
+  .cats button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%; min-height: 56px; border: 0; background: none; padding: 12px 4px; font-size: 13px; line-height: 1.3; color: #5f5a52; position: relative; overflow-wrap: normal; word-break: normal; hyphens: manual; }
+  /* 分类名只在词与词之间换行；一个词太长放不下时（如 Accompagnements）由 fitCats() 把这一个按钮的字缩小（最小 11px），绝不把词拆开 */
+  .cats button > span:not(.n) { display: block; max-width: 100%; }
+  /* 缩到最小字号还放不下：按当前语言加连字符断词（Accompa-gnements）；手机浏览器没有这个语言的断词表时，末尾用省略号（长按看全名） */
+  .cats button.hy > span:not(.n) { hyphens: auto; -webkit-hyphens: auto; overflow: hidden; text-overflow: ellipsis; }
+  .cats button.on { background: #fff; color: var(--text); font-weight: 700; }
+  .cats button.on::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; background: var(--accent); border-radius: 0 2px 2px 0; }
+  .cats .n { position: absolute; top: 6px; right: 6px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; border-radius: 99px; min-width: 18px; height: 18px; line-height: 18px; padding: 0 5px; }
+  .cats .ic-hot, .next-cat .ic-hot { color: var(--warn); font-size: 15px; }
+  .items { padding: 4px 16px calc(116px + env(safe-area-inset-bottom, 0px)); }
+  /* 分类标题：只写分类名（左边分类栏已经有了，不再加图标和数量）；「热销」下面一行小字说明 */
+  .cat-title { padding: 16px 0 4px; }
+  .cat-title h2 { font-size: 18px; font-weight: 700; line-height: 1.3; letter-spacing: -.01em; }
+  .cat-title .cat-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  /* 菜品一行：有图 = 左边方图；没图 = 同样的排版，只是没有图（不放占位图） */
+  .dish { display: flex; align-items: stretch; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--line-soft); }
+  .dish .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .dish .name { font-size: 15px; font-weight: 600; line-height: 1.35; color: var(--text); overflow-wrap: break-word; }
+  .dish .meta { font-size: 13px; line-height: 1.35; color: var(--muted); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  /* 价格和「+」在同一行（「+」放在文字栏里，菜名能用满整栏宽度，不会被「− 2 +」挤成一个字一行） */
+  .dish-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; margin-top: auto; padding-top: 2px; }
+  .dish .price { font-size: 15px; font-weight: 700; color: var(--text); white-space: nowrap; }
+  .dish .price small { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .dish .stepper { margin-left: auto; }
+  /* 爆款：一个安静的小标（琥珀色），放在菜名上面一行 */
+  /* 招牌标记（店主 10-26）：有图叠在图片左上角，没图跟在菜名前面，都不单独占一行、不挤菜名和价格 */
+  .dish .hot-badge { display: inline-flex; align-items: center; gap: 3px; vertical-align: 2px; margin: 0 6px 0 0; padding: 1px 7px 1px 5px; border-radius: 6px; background: var(--warn-soft); color: var(--warn-text); font-size: 12px; font-weight: 700; line-height: 1.4; }
+  .dish .hot-badge .ic { font-size: 12px; fill: currentColor; stroke: none; }
+  .thumb-btn { position: relative; border: 0; padding: 0; background: none; flex-shrink: 0; cursor: zoom-in; border-radius: 12px; align-self: flex-start; }
+  .thumb-btn .hot-badge { position: absolute; top: 4px; left: 4px; margin: 0; max-width: calc(100% - 8px); padding: 1px 6px 1px 4px; font-size: 11px; box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+  .thumb-btn .hot-badge span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .thumb-btn .zoom-hint { position: absolute; right: 4px; bottom: 4px; width: 22px; height: 22px; border-radius: 6px; background: rgba(0,0,0,.42); color: #fff; display: grid; place-items: center; font-size: 13px; }
+  .zoom-mask { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.92); display: flex; flex-direction: column; animation: zin .15s ease; }
+  @keyframes zin { from { opacity: 0; } to { opacity: 1; } }
+  .zoom-img { flex: 1; display: flex; align-items: center; justify-content: center; overflow: auto; min-height: 0; touch-action: pinch-zoom; }
+  .zoom-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .zoom-x { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 12px; z-index: 1; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.15); color: #fff; font-size: 28px; line-height: 1; }
+  .zoom-info { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); background: #fff; }
+  .zoom-info b { font-size: 17px; } .zoom-info .price { color: var(--accent); font-weight: 700; margin-top: 2px; }
+  .zoom-info .btn { flex-shrink: 0; min-width: 120px; }
+  .dish .thumb { display: block; width: 88px; height: 88px; border-radius: 12px; background: var(--surface-2); color: var(--accent); font-size: 24px; flex-shrink: 0; object-fit: cover; }
+  .sheet .row .n .item-opts { margin-top: 2px; }
+  /* 加菜按钮：每道菜右下角一个圆形「+」（有规格的菜点「+」弹出选规格），点击范围 44px */
+  .stepper { display: flex; align-items: center; gap: 4px; }
+  .stepper button { position: relative; width: 34px; height: 34px; border-radius: 50%; border: 0; padding: 0; font-size: 18px; line-height: 1; display: grid; place-items: center; cursor: pointer; flex: none; }
+  .stepper button::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; }
+  .stepper button .ic { font-size: 18px; stroke-width: 2.4; }
+  .stepper .minus { background: #fff; border: 1.5px solid #d6d2ca; color: var(--text); }
+  .stepper .plus, .stepper .spec { background: var(--accent); color: var(--on-accent); box-shadow: 0 2px 6px -2px rgba(0,0,0,.35); }
+  .stepper .plus:active, .stepper .spec:active { transform: scale(.94); }
+  .stepper .q { min-width: 24px; text-align: center; font-weight: 700; font-size: 15px; }
+  .spec .n { position: absolute; top: -6px; right: -6px; z-index: 1; background: var(--text); color: #fff; border: 2px solid #fff; border-radius: 99px; min-width: 20px; height: 20px; line-height: 16px; font-size: 11px; font-weight: 700; padding: 0 4px; }
+  /* 过敏原：菜名下面一行小字（短名字，点「过敏原说明」看完整名称） */
+  /* 一行放不下就在两个过敏原之间换行（不会把页面撑宽） */
+  .alg-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; min-width: 0; font-size: 12px; line-height: 1.45; color: #6b655c; }
+  .alg-row .ic { font-size: 13px; margin-right: 4px; color: var(--warn); vertical-align: -2px; }
+  .alg-row .alg { min-width: 0; overflow-wrap: break-word; }
+  .alg-row .alg + .alg::before { content: "·"; margin-right: 4px; color: #b5afa5; }
+  .alg-row.alg-ask { color: var(--muted); }
+  .alg-unknown { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn-text); font-size: 13px; line-height: 1.45; }
+  .alg-unknown .ic { flex: none; margin-top: 2px; }
+
+  .cartbar { position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); height: 60px; background: #1f1d1a; color: #fff; border-radius: 30px; display: flex; align-items: center; padding: 0 8px 0 20px; gap: 10px; z-index: 10; box-shadow: 0 10px 28px -8px rgba(0,0,0,.45); }
+  .cartbar .sum { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; }
+  .cartbar .sum .ic { font-size: 22px; flex: none; opacity: .9; }
+  .cartbar .sum small { font-size: 13px; font-weight: 500; color: #b9b3aa; }
+  .cartbar .sum .empty { font-size: 14px; font-weight: 400; color: #b9b3aa; }
+  /* v1.42.13：按钮法语改成「Voir le panier」（比 C'est choisi 长）：空购物车提示放不下就折行（双语上下两行），窄手机按钮左右留白小一点 */
+  .cartbar .sum .empty { min-width: 0; white-space: normal; line-height: 1.2; }
+  html.i18n-dual .cartbar .sum .empty .i18n-2 { display: block; margin-left: 0; }
+  @media (max-width: 380px) { .cartbar { padding-left: 16px; } .cartbar .go { padding: 0 16px; } }
+  .cartbar .go { background: var(--go-bg); color: var(--go-fg); border: 0; border-radius: 22px; padding: 0 24px; height: 44px; font-size: 15px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+  .cartbar .go:disabled { background: rgba(255,255,255,.12); color: rgba(255,255,255,.55); cursor: default; }
+  .cartbar .ordered { background: none; border: 1px solid #4d4840; color: #e6e1d9; border-radius: 22px; padding: 0 14px; height: 44px; font-size: 13px; white-space: nowrap; }
+  /* 暂停接单 / 打烊的底栏：外语长句子能换行，「我的外带单」按钮不挤住文字（测试总 G：法语 390 宽被截成「Plus de comma…」） */
+  .cartbar.closed-bar { height: auto; min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
+  .cartbar.closed-bar .sum { white-space: normal; line-height: 1.25; }
+  .cartbar.closed-bar .ordered { flex: none; max-width: 46%; height: auto; min-height: 44px; padding: 4px 12px; white-space: normal; line-height: 1.2; }
+
+  .sheet:focus { outline: none; }
+  .sheet-mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 20; display: flex; align-items: flex-end; }
+  .sheet { background: #fff; width: 100%; max-width: 640px; margin: 0 auto; border-radius: 20px 20px 0 0; max-height: 75vh; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .sheet .sh { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 8px 12px 16px; border-bottom: 1px solid var(--line-soft); font-size: 16px; }
+  .sheet .sh .icon-btn { width: 44px; height: 44px; font-size: 26px; }
+  .sheet .sb { overflow-y: auto; padding: 0 16px; }
+  .sheet .sf { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+  /* v1.25.2：「这道菜已经点过了」提醒 */
+  .dup-msg { font-size: 17px; line-height: 1.5; margin: 18px 0; }
+  .dup-sheet .sf .btn { flex: 1; min-height: 48px; }
+  /* v1.26 同桌共享购物车 */
+  .head .tme { flex: none; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 99px; border: 1px solid rgba(255,255,255,.45); white-space: nowrap; }
+  .sc-group { padding: 4px 0 6px; }
+  .sc-group + .sc-group { border-top: 1px solid var(--line); }
+  .sc-gh { font-size: 13px; font-weight: 700; color: var(--muted); padding: 10px 0 0; }
+  .sc-empty { font-size: 13px; color: var(--muted); padding: 10px 0; }
+  .sheet .row.other .q { min-width: 32px; text-align: right; font-weight: 600; }
+  .sc-rm { width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 50%; background: none; color: var(--muted); font-size: 18px; line-height: 1; flex: none; cursor: pointer; }
+  .sc-note-by { margin-left: 6px; font-weight: 400; }
+  .sc-busy { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn-text); font-size: 14px; line-height: 1.45; display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; }
+  .sc-busy .ic { margin-top: 3px; }
+  .sc-busy-btns { grid-column: 1 / -1; display: flex; gap: 8px; }
+  .sc-busy-btns .btn { flex: 1; min-height: 44px; }
+  .sc-float { position: fixed; left: 12px; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 10px); z-index: 30; max-width: 616px; margin: 0 auto; padding: 12px 16px; border-radius: 12px; font-size: 15px; font-weight: 600; line-height: 1.4; box-shadow: 0 8px 24px -8px rgba(0,0,0,.35); text-align: center; }
+  .sc-float.sent { background: #166534; color: #fff; }
+  .sc-float.warn { background: var(--warn-soft); color: var(--warn-text); top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); font-weight: 500; font-size: 13px; padding: 8px 12px; }
+  .sc-float.moved { background: #1e3a8a; color: #fff; }
+  .sheet .stepper button { min-width: 44px; min-height: 44px; }
+  .sc-ended { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.55); display: grid; place-items: center; padding: 16px; }
+  .sc-ended-card { background: #fff; color: var(--text); border-radius: 16px; padding: 22px 20px; max-width: 420px; width: 100%; text-align: center; font-size: 16px; line-height: 1.5; }
+  .sc-ended-card .btn { width: 100%; margin-top: 8px; }
+  .sheet .row { display: flex; align-items: center; gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--line-soft); }
+  .sheet .row .n { flex: 1; }
+
+  .tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; padding: 0 16px 8px; }
+  .area-title { padding: 16px 16px 8px; font-size: 13px; color: var(--muted); }
+  .tables button { border: 1.5px solid var(--line); background: #fff; border-radius: 12px; padding: 14px 6px; font-size: 22px; font-weight: 700; }
+  .tables button small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+  .tables .s-occupied { background: var(--occupied); border-color: var(--occupied-line); }
+  .tables .s-billing { background: var(--billing); border-color: var(--billing-line); }
+  .touch .stepper button { width: 36px; height: 36px; }
+  .kiosk .stepper button { width: 44px; height: 44px; } /* 点餐机（平板立着给顾客点）：加减按钮至少 44px（B22）；手机顾客页不变 */
+  .gway-link { display: flex; align-items: center; gap: 10px; margin: 8px 12px 0; padding: 10px 14px; min-height: 48px; border-radius: 12px; background: #0c3b2c; color: #fff; text-decoration: none; font-size: 14px; }
+  .gway-link b { display: inline-flex; align-items: center; gap: 6px; color: #f5a524; white-space: nowrap; }
+  .gway-link span { flex: 1; opacity: .9; }
+  .gway-link i { font-style: normal; display: inline-flex; font-size: 18px; opacity: .7; }
+  .remote-fields { margin: 12px 0 4px; padding: 10px 12px; border-radius: 12px; background: #f6f4f0; display: grid; gap: 8px; }
+  .remote-fields .rf-title { font-weight: 600; }
+  .pay-choice { display: grid; gap: 6px; }
+  .pay-choice label { display: flex; gap: 8px; align-items: center; font-size: 15px; color: var(--text); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .pay-choice input { width: 18px; height: 18px; }
+  .v-pay { margin: 12px 0 0; width: 100%; white-space: normal; height: auto; min-height: 44px; line-height: 1.35; padding-top: 8px; padding-bottom: 8px; }
+  .remote-fields label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+  .remote-fields label[hidden] { display: none; }
+  .remote-fields input, .remote-fields select { font-size: 16px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--text); }
+  .notice { margin: 40px 20px; text-align: center; color: var(--muted); }
+  /* 口味备注：文字按钮（不加边框），点击高度 44px */
+  .note-btn { display: flex; align-items: center; width: max-content; max-width: 100%; min-height: 44px; min-width: 44px; margin: 2px 0 -8px; border: 0; background: none; font-size: 13px; font-weight: 600; padding: 0; color: var(--accent-text); text-align: left; cursor: pointer; }
+  .note-btn.has { color: var(--accent-text); font-weight: 600; }
+  .item-opts.note { color: var(--accent); font-weight: 600; }
+  .order-note-field { display: grid; gap: 6px; padding: 12px 0 4px; font-size: 13px; color: var(--muted); }
+  .order-note-field textarea, .note-input { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; color: var(--text); }
+  .note-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 0; }
+  .note-chips button { border: 1px solid var(--line); background: #faf9f7; border-radius: 22px; min-height: 44px; padding: 0 16px; font-size: 14px; }
+  .note-chips button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .note-input { margin-bottom: 14px; }
+  .voucher { padding: 16px; display: grid; gap: 14px; }
+  .v-card { background: #fff; border: 2px solid var(--c); border-radius: 18px; padding: 22px 16px; text-align: center; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
+  .v-label { color: var(--muted); font-size: 14px; }
+  .v-no { font-size: 72px; font-weight: 800; line-height: 1.1; letter-spacing: 2px; color: var(--c); }
+  .v-status { display: inline-block; margin-top: 6px; padding: 4px 14px; border-radius: 99px; background: var(--c); color: #fff; font-weight: 600; }
+  .v-tip { margin: 14px 0 0; line-height: 1.7; }
+  .v-items { background: #faf9f7; border-radius: 14px; padding: 4px 14px 12px; }
+  .v-items .row { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+  .v-items .row .n { flex: 1; }
+  .v-items .row.total { border-bottom: 0; font-size: 18px; }
+  .v-actions { display: flex; gap: 10px; }
+  .v-actions .btn { flex: 1; padding: 12px; }
+  /* 平板自助点餐机 */
+  @media (min-width: 700px) { /* 平板 / 电脑：一排两三张卡片，同一排一样高；有图没图排版一样（图在左边） */
+    .kiosk .head h1 { font-size: 22px; }
+    .menu { grid-template-columns: 132px minmax(0, 1fr); }
+    .cats button { font-size: 14.5px; min-height: 60px; padding: 14px 10px; }
+    .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; align-content: start; padding: 8px 24px calc(120px + env(safe-area-inset-bottom, 0px)); }
+    .items > :not(.dish) { grid-column: 1 / -1; }
+    .cat-title { padding: 20px 0 4px; }
+    .cat-title h2 { font-size: 20px; }
+    .dish { min-height: 124px; padding: 14px; border: 1px solid #e9e6e0; border-radius: var(--radius-lg); background: #fff; transition: border-color .15s, box-shadow .15s; }
+    .dish:hover { border-color: #d6d1c8; box-shadow: 0 4px 14px -8px rgba(0,0,0,.25); }
+    .dish .thumb { width: 96px; height: 96px; }
+    .kiosk .dish .thumb { width: 120px; height: 120px; }
+    .kiosk .dish .name { font-size: 18px; }
+    .kiosk .cartbar { height: 68px; border-radius: 34px; }
+    .kiosk .cartbar .go { font-size: 18px; height: 52px; border-radius: 26px; padding: 0 32px; }
+    /* 购物车条：宽屏上不拉满整行，放在右下角 */
+    .cartbar { left: auto; right: 24px; width: min(560px, calc(100% - 48px)); }
+    /* 左边分类栏的灰底铺到底（以前给购物车条让出 84px，宽屏上购物车条在右边，左下角空出一块白） */
+    .menu { background: linear-gradient(to right, var(--surface-2) 132px, transparent 0); }
+    /* 平板竖屏点餐机：一排两张卡片（以前一张，中间空一大块） */
+    .kiosk .items { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    /* 卡片窄时过敏原那一行字小一点，不让最后一个字单独掉到下一行 */
+    .items .alg-row { font-size: 11.5px; letter-spacing: -.2px; }
+  }
+  /* 大屏点餐机（1400 以上）：字大一点 */
+  @media (min-width: 1400px) {
+    .kiosk .dish .name { font-size: 20px; }
+    .kiosk .cats button { font-size: 17px; }
+    .kiosk .items { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+  }
+
+  @media (min-width: 1400px) { .items { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); } }
+  .dine-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+  .dine-pick button { border: 2px solid var(--line); background: #fff; border-radius: 14px; padding: 16px 8px; font-size: 18px; font-weight: 600; }
+  .dine-pick button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .pack-hint { font-size: 13px; margin: 12px 0 -4px; }
+  .kiosk-done { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; box-sizing: border-box; gap: 6px; }
+  .kiosk-done .kd-label { font-size: 20px; color: var(--muted); }
+  /* 平板刷卡：失败后「再刷 / 改现金 / 取消」竖着排（不用 gap，老平板浏览器不认） */
+  .kiosk-pay .kp-btns { display: flex; flex-direction: column; width: 100%; max-width: 420px; margin-top: 12px; }
+  .kiosk-pay .kp-btns .btn { margin-top: 8px; }
+  .kiosk-pay #kpCancel { margin-top: 16px; }
+  .kiosk-done .kd-no { font-size: 96px; font-weight: 800; color: var(--accent); line-height: 1; }
+  .kiosk-done .kd-dine { font-size: 22px; font-weight: 700; }
+  .kiosk-done .kd-tip { font-size: 24px; font-weight: 700; margin: 18px 0 4px; }
+  .kiosk-done .kd-total { font-size: 20px; margin: 10px 0 22px; }
+  .kiosk-done .btn { min-width: 240px; }
+  /* 做好了：全屏提醒，点「我知道了」才停 */
+  .ready-mask { position: fixed; inset: 0; z-index: 300; background: #16873f; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 10px; animation: rflash 1s ease-in-out infinite alternate; }
+  @keyframes rflash { from { background: #16873f; } to { background: #0f6a30; } }
+  .ready-mask .rm-no { font-size: 84px; font-weight: 800; line-height: 1; }
+  .ready-mask .rm-t { font-size: 26px; font-weight: 700; }
+  .ready-mask .btn { background: #fff; color: #16873f; min-width: 220px; margin-top: 20px; }
+  /* 过敏原说明：列表最下面一块（以前顶部、底部各一次，重复） */
+  /* 顾客页：选规格弹窗里的选项、数量、关闭、加入按钮，点击范围都 ≥ 44px */
+  .opt-panel .opt { min-height: 44px; padding: 8px 16px; }
+  .opt-panel .opt-qty button { width: 44px; height: 44px; font-size: 18px; }
+  .opt-panel .opt-close, .icon-btn { min-width: 44px; min-height: 44px; }
+  .opt-foot .btn, .zoom-info .btn { min-height: 44px; }
+  .opt.on { color: var(--accent-text); }
+  @media (prefers-reduced-motion: reduce) { .cats { scroll-behavior: auto; } .zoom-mask { animation: none; } .stepper .plus:active, .stepper .spec:active { transform: none; } }
+  .alg-foot { display: grid; gap: 4px; margin: 24px 0 0; padding: 12px 16px; background: var(--surface-2); border-radius: 12px; font-size: 13px; line-height: 1.5; color: #5f5a52; }
+  .alg-link { display: inline-flex; align-items: center; gap: 6px; width: max-content; min-height: 44px; border: 0; background: none; color: var(--accent-text); font-size: 14px; padding: 0; font-weight: 700; cursor: pointer; }
+  .alg-link .ic { font-size: 16px; }
+  .alg-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin: 8px 0 12px; }
+  .alg-legend div { display: grid; gap: 1px; padding: 8px 10px; border-radius: 10px; background: #f6f5f2; font-size: 13px; line-height: 1.35; }
+  .alg-legend b { font-size: 14px; }
+  .alg-legend .muted { font-size: 12px; }
+  .alg-names { font-size: 12px; color: #92400e; margin: 2px 0; }
+  .alg-cart { background: #fffaf0; border: 1px solid #f3dcae; border-radius: 12px; padding: 10px 12px; margin: 12px 0; font-size: 13px; line-height: 1.6; }
+  .alg-cart > b { display: inline-flex; align-items: center; gap: 6px; color: #92400e; }
+  .alg-ok { display: flex; gap: 8px; align-items: center; margin-top: 6px; font-weight: 600; font-size: 14px; }
+  /* 限量的菜（v1.25）：卖完 = 灰色「已售完」，点不了（不隐藏）；剩 3 份以内 = 琥珀色「只剩 N 份」；加满了「+」变淡 */
+  .dish.sold-out .thumb-btn, .dish.sold-out .name, .dish.sold-out .meta, .dish.sold-out .price { opacity: .5; }
+  .dish.sold-out .thumb { filter: grayscale(1); }
+  .so-tag { display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border-radius: 8px; background: var(--surface-2); color: #5f5a52; font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .low-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; background: var(--warn-soft); color: var(--warn-text); font-size: 12px; font-weight: 700; line-height: 1.4; white-space: nowrap; }
+  .dish-foot .low-badge { margin-right: auto; }
+  .stepper button.capped { opacity: .4; box-shadow: none; cursor: not-allowed; }
+  .zoom-info .btn:disabled { opacity: .55; }
+  .stock-msg { display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn-text); font-size: 14px; line-height: 1.45; }
+  .stock-msg .ic { flex: none; margin-top: 3px; }
+  .stock-msg b { display: block; }
+  .v-others { font-size: 13px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  /* 配送方式（电商版第 3 批） */
+  .dv-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+  .dv-pick button { display: grid; justify-items: center; gap: 2px; min-height: 76px; padding: 8px 4px; border: 2px solid var(--line); border-radius: 12px; background: #fff; color: var(--text); cursor: pointer; text-align: center; }
+  .dv-pick button .dv-i { font-size: 22px; line-height: 1.1; }
+  .dv-pick button b { font-size: 14px; line-height: 1.25; }
+  .dv-pick button small { font-size: 12px; color: var(--muted); }
+  .dv-pick button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+  .dv-two { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 8px; }
+  .dv-geo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+  .dv-geo .btn { min-height: 40px; }
+  .dv-ok { color: #15803d; font-weight: 600; }
+  .dv-days { margin: 2px 0; font-size: 14px; font-weight: 600; }
+  .dv-sum { margin: 4px 0 0; }
+  .dv-sum .row { padding: 10px 0; }
+  .dv-free { font-size: 12px; margin-top: -4px; }
+  .v-dv { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 4px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+  .v-track { margin-top: 4px; font-size: 15px; }
+  /* ===== 电商版（v1.38，店主 10-12）：网上点餐链接、店内外带码可以选「电商版」——方格排列、下拉切换分区、点开看详情（多图、介绍、参数） ===== */
+  .shop .menu.shop-wrap { display: block; background: none; }
+  .shop-bar select { flex: none; max-width: 46%; height: 44px; border: 1px solid var(--line); border-radius: 22px; padding: 0 30px 0 14px; font-size: 15px; font-weight: 600; color: var(--text); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a746a' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center / 16px; -webkit-appearance: none; appearance: none; text-overflow: ellipsis; }
+  .shop-bar { gap: 8px; }
+  .shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-content: start; padding: 12px 12px calc(116px + env(safe-area-inset-bottom, 0px)); }
+  .shop-grid > :not(.pcard) { grid-column: 1 / -1; }
+  .shop-grid > .pcard { grid-column: auto; } /* 宽屏「.items > 不是菜的都占一整行」那条规则不管产品卡片 */
+  .shop-grid .cat-title { padding: 10px 2px 0; }
+  .shop-grid .search-hint { padding: 4px 2px 0; }
+  .pcard { display: flex; flex-direction: column; min-width: 0; background: #fff; border: 1px solid #ece9e3; border-radius: 14px; overflow: hidden; cursor: pointer; transition: box-shadow .15s, border-color .15s; }
+  .pcard:hover { border-color: #d6d1c8; box-shadow: 0 6px 18px -10px rgba(0,0,0,.3); }
+  .pc-img { position: relative; aspect-ratio: 1; background: var(--surface-2); }
+  .pc-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pc-img .ph { width: 100%; height: 100%; display: grid; place-items: center; font-size: 40px; font-weight: 700; color: var(--accent); background: var(--accent-soft); }
+  .gv-box { display: grid; gap: 10px; padding: 4px 0; }
+  .gv-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .gv-l { width: 100%; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .gv { min-height: 40px; min-width: 48px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; color: var(--text); font-size: 15px; font-weight: 600; cursor: pointer; }
+  .gv.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+  .gv.off { color: #b5afa5; text-decoration: line-through; border-style: dashed; }
+  .gv:disabled { opacity: .45; cursor: not-allowed; }
+  .gw-step { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+  .gw-step button { width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--line); background: #fff; display: grid; place-items: center; cursor: pointer; }
+  .gw-step b { min-width: 64px; text-align: center; }
+  .gw-price { font-size: 15px; color: var(--muted); }
+  .gw-price b { color: var(--accent-text); font-size: 18px; }
+  .pc-tags, .pd-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .pc-tags { position: absolute; top: 8px; left: 8px; right: 8px; }
+  .new-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 700; line-height: 1.4; }
+  .pc-tags .hot-badge { position: static !important; }
+  .shop-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+  .shop-sort { display: inline-flex; align-items: center; gap: 6px; }
+  .shop-sort select { height: 36px; border: 1px solid var(--line); border-radius: 18px; padding: 0 10px; font-size: 14px; background: #fff; color: var(--text); max-width: 60vw; }
+  .tno-btn { border: 0; color: inherit; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 32px; }
+  .lk-mine { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 12px; }
+  .lk-mine .rf-title { width: 100%; }
+  .lk-form { display: flex; gap: 8px; margin: 6px 0 4px; }
+  .lk-form input { flex: 1; min-width: 0; font-size: 16px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .lk-out { padding-bottom: 16px; }
+  .lk-row { padding: 12px 0; border-bottom: 1px solid var(--line-soft); display: grid; gap: 2px; }
+  .lk-top { display: flex; gap: 10px; align-items: baseline; }
+  .lk-top .lk-st { flex: 1; font-weight: 600; color: var(--accent-text); }
+  .lk-sub { font-size: 13px; }
+  .lk-track { font-size: 14px; }
+  .lk-track a, .v-track a { color: var(--accent-text); }
+  .pc-img .hot-badge { position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 3px; padding: 2px 8px 2px 6px; border-radius: 6px; background: var(--warn-soft); color: var(--warn-text); font-size: 12px; font-weight: 700; }
+  .pc-img .hot-badge .ic { font-size: 12px; fill: currentColor; stroke: none; }
+  .pc-n { position: absolute; right: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 99px; background: rgba(0,0,0,.5); color: #fff; font-size: 12px; font-weight: 600; }
+  .pc-body { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 10px 10px 10px 12px; min-width: 0; }
+  .pc-name { font-size: 14.5px; font-weight: 600; line-height: 1.35; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .pc-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+  .pc-foot .price { font-size: 15px; font-weight: 700; color: var(--text); white-space: nowrap; }
+  .pc-foot .price small { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .pc-foot .stepper { margin-left: auto; }
+  .pc-foot .low-badge { font-size: 11px; }
+  .pcard.sold-out .pc-img img { filter: grayscale(1); opacity: .6; }
+  .pcard.sold-out .pc-name, .pcard.sold-out .price { opacity: .55; }
+  @media (min-width: 600px) { .shop-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; padding: 14px 20px calc(120px + env(safe-area-inset-bottom, 0px)); } }
+  @media (min-width: 1200px) { .shop-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); max-width: 1400px; margin: 0 auto; width: 100%; box-sizing: border-box; } }
+  /* 详情页：整页（手机返回键回到列表）；宽屏图片在左、介绍在右 */
+  .pd-page { position: fixed; inset: 0; z-index: 15; background: #fff; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .pd-top { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top, 0px) + 8px) 84px 8px 8px; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--line-soft); }
+  .pd-page:focus, .pd-top .pd-back:focus:not(:focus-visible) { outline: none; }
+  .pd-top .pd-back { width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--text); font-size: 26px; line-height: 1; flex: none; cursor: pointer; }
+  .pd-top .pd-share { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 20px; background: #fff; color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; }
+  .pd-top .pd-share .ic { font-size: 16px; }
+  .pd-top .pd-title { flex: 1; min-width: 0; font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pd-main { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .pd-media { position: relative; background: var(--surface-2); }
+  .pd-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .pd-track::-webkit-scrollbar { display: none; }
+  .pd-track img { flex: 0 0 100%; width: 100%; aspect-ratio: 1; object-fit: cover; scroll-snap-align: start; display: block; cursor: zoom-in; user-select: none; }
+  .pd-track .ph { flex: 0 0 100%; aspect-ratio: 1; display: grid; place-items: center; font-size: 80px; font-weight: 700; color: var(--accent); background: var(--accent-soft); }
+  .pd-dots { position: absolute; left: 0; right: 0; bottom: 10px; display: flex; justify-content: center; gap: 6px; pointer-events: none; }
+  .pd-dots span { width: 7px; height: 7px; border-radius: 4px; background: rgba(255,255,255,.65); box-shadow: 0 0 2px rgba(0,0,0,.4); transition: width .2s; }
+  .pd-dots span.on { width: 18px; background: #fff; }
+  .pd-thumbs { display: flex; gap: 8px; padding: 10px 16px 0; overflow-x: auto; scrollbar-width: none; background: #fff; }
+  .pd-thumbs::-webkit-scrollbar { display: none; }
+  .pd-thumbs button { flex: none; width: 56px; height: 56px; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; background: var(--surface-2); cursor: pointer; opacity: .6; }
+  .pd-thumbs button.on { border-color: var(--accent); opacity: 1; }
+  .pd-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pd-info { padding: 14px 16px 0; display: grid; gap: 10px; }
+  .pd-info h1 { font-size: 21px; line-height: 1.3; margin: 0; letter-spacing: -.01em; overflow-wrap: anywhere; }
+  .pd-info .hot-badge { display: flex; align-items: center; gap: 4px; width: max-content; padding: 2px 8px 2px 6px; border-radius: 6px; background: var(--warn-soft); color: var(--warn-text); font-size: 12px; font-weight: 700; }
+  .pd-info .hot-badge .ic { font-size: 12px; fill: currentColor; stroke: none; }
+  .pd-price { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 22px; font-weight: 800; color: var(--accent-text); }
+  .pd-price small { font-size: 13px; font-weight: 500; color: var(--muted); }
+  .pd-opts { font-size: 14px; color: var(--muted); }
+  .pd-sec { border-top: 1px solid var(--line-soft); padding-top: 12px; }
+  .pd-sec h2 { font-size: 15px; margin: 0 0 6px; }
+  .pd-desc { font-size: 15px; line-height: 1.65; color: #3d3933; white-space: pre-line; overflow-wrap: anywhere; }
+  .pd-details { display: grid; gap: 0; margin: 0 -16px; }
+  .pd-details img { display: block; width: 100%; height: auto; }
+  @media (min-width: 900px) { .pd-details { margin: 0; border-radius: 12px; overflow: hidden; } }
+  .pd-specs { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .pd-specs th, .pd-specs td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft); overflow-wrap: anywhere; }
+  .pd-specs th { width: 38%; color: var(--muted); font-weight: 500; background: #faf9f7; }
+  .pd-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; display: flex; align-items: center; gap: 10px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); background: #fff; border-top: 1px solid var(--line); box-shadow: 0 -6px 20px -12px rgba(0,0,0,.25); }
+  .pd-bar .pd-cart { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 48px; padding: 0 14px; border: 1px solid var(--line); border-radius: 24px; background: #fff; color: var(--text); font-size: 15px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .pd-bar .pd-cart .ic { font-size: 20px; }
+  .pd-bar .pd-cart .n { min-width: 20px; height: 20px; line-height: 20px; padding: 0 5px; border-radius: 10px; background: var(--accent); color: var(--on-accent); font-size: 12px; text-align: center; }
+  .pd-bar .stepper { margin-left: auto; }
+  .pd-bar .pd-add { flex: 1; min-height: 48px; border-radius: 24px; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pd-bar .pd-in { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 10px; font-size: 14px; color: var(--muted); }
+  @media (min-width: 900px) {
+    .pd-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; max-width: 1100px; margin: 0 auto; padding: 24px 24px 120px; align-items: start; }
+    .pd-gallery { position: sticky; top: 84px; }
+    .pd-media { border-radius: 16px; overflow: hidden; background: #fff; }
+    .pd-track img, .pd-track .ph { border-radius: 16px; }
+    .pd-thumbs { padding: 10px 0 0; }
+    .pd-info { padding: 0; }
+    .pd-info h1 { font-size: 26px; }
+    .pd-bar { left: auto; right: 24px; bottom: 24px; width: min(520px, calc(100% - 48px)); border-radius: 20px; border: 1px solid var(--line); }
+  }
+  @media (prefers-reduced-motion: reduce) { .pd-dots span { transition: none; } }
+</style>
+<link rel="stylesheet" href="store-theme.css"><!-- 点餐页主题（店主 10-26）：只在 <html data-store-theme> 时生效，放在上面的样式后面 -->
+</head>
+<body>
+<div id="app"></div>
+<script src="i18n.js"></script>
+<script src="common.js"></script>
+<script src="agent.js"></script>
+<div id="langFloat" class="lang-float"></div>
+<script>
+// 三种模式：
+//   顾客扫桌贴码：order.html?t=<桌贴token>  —— 只能给这一桌点菜，下单直接出后厨单
+//   顾客扫外带码：order.html?t=<外带token>  —— 下单后显示取餐号凭证，到前台付款后才出后厨单
+//   服务员点单：order.html                 —— PIN 登录后选桌点菜
+const params = new URLSearchParams(location.search);
+const customerToken = params.get("t");
+// 这台手机的随机编号（店里扫外带码：每台手机同时最多 3 张没完成的单，第三批）
+const DEVICE = (() => {
+  try {
+    let d = localStorage.getItem("pos_device");
+    if (!d) {
+      const a = new Uint8Array(12);
+      crypto.getRandomValues(a);
+      d = Array.prototype.map.call(a, (x) => ("0" + x.toString(16)).slice(-2)).join("");
+      localStorage.setItem("pos_device", d);
+    }
+    return d;
+  } catch (e) { return undefined; }
+})();
+const S = {
+  staff: null, table: null, categories: [], items: [], cart: new Map(), ordered: null, cat: null, q: "", storeName: "点餐",
+  takeaway: false, expireMinutes: 30, notePresets: [], orderNote: "", voucher: null, voucherToken: null,
+};
+const app = $("#app");
+
+onUnauthorized = () => { store.set("pos_token", null); reloadPage(); };
+
+// 顾客第一次打开：按手机的语言偏好顺序找第一个支持的语言（法语手机显示法语、中文手机显示中文）；
+// 都不支持（比如德语手机）就用店里设置的默认语言（默认法语）。服务员默认中文
+function phoneLang(fallback = "fr") {
+  const prefs = [...(navigator.languages || []), navigator.language || ""];
+  for (const p of prefs) {
+    const l = String(p).slice(0, 2).toLowerCase();
+    if (["zh", "fr", "en", "es", "pt"].includes(l)) return l;
+  }
+  return fallback;
+}
+const CART_KEY = "cart_" + (customerToken || "staff");
+
+// 线条图标（代替表情符号：各种手机上显示一样，颜色跟文字走）
+const svgIc = (body, cls = "") => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${body}</svg>`;
+const ICON = {
+  plus: svgIc('<path d="M12 5v14M5 12h14"/>'),
+  minus: svgIc('<path d="M5 12h14"/>'),
+  flame: svgIc('<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>', "ic-hot"),
+  star: svgIc('<path d="M12 2.8l2.8 6 6.5.7-4.9 4.4 1.4 6.4L12 17l-5.8 3.3 1.4-6.4-4.9-4.4 6.5-.7z"/>'),
+  bag: svgIc('<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>'),
+  expand: svgIc('<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>'),
+  info: svgIc('<circle cx="12" cy="12" r="9.5"/><path d="M12 16v-4.5M12 8h.01"/>'),
+  moon: svgIc('<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/>'),
+  chevron: svgIc('<path d="m9 18 6-6-6-6"/>'),
+  share: svgIc('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>'),
+  alert: svgIc('<path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3"/><path d="M12 9v4M12 17h.01"/>'),
+};
+// 过敏原在菜单列表里用短名字（完整的法规名称在「过敏原说明」里）
+const ALG_SHORT = { gluten: "麸质", sulphites: "亚硫酸盐" };
+
+// v1.25.1：顾客页一打开就把店铺信息、菜单、桌台这几个请求同时发出去（以前一个接一个，手机网络慢时每个要等半秒多）；
+// 拿到以后还是按原来的顺序处理
+const PREFETCH = {};
+function prefetch(key, url) { const p = api(url, { auth: false }); p.catch(() => {}); PREFETCH[key] = p; }
+const takePrefetch = (key) => { const p = PREFETCH[key]; delete PREFETCH[key]; return p; };
+
+async function boot() {
+  const infoP = api("/api/public/info", { auth: false }).catch(() => null);
+  if (customerToken) { prefetch("menu", "/api/public/menu"); prefetch("table", `/api/public/tables/${encodeURIComponent(customerToken)}`); }
+  // 手机语言是支持的语言：不用等店铺信息（店里的默认语言只在手机语言不支持时才用）
+  const navLang = phoneLang(null);
+  const pre = customerToken && !navLang ? await infoP : null;
+  // 电商版的网上商店（网上下单链接、店内外带码；桌贴码、点餐机照旧）：页面上的「点餐、菜品、取餐、餐厅」换成中性词（店主 10-15）
+  // 店铺信息和桌台信息本来就同时在拿，这里等两个都到再开始翻译
+  let shopVocab = false;
+  if (customerToken) {
+    const [inf, tb] = await Promise.all([infoP, PREFETCH.table ? PREFETCH.table.catch(() => null) : null]);
+    shopVocab = inf?.shop_style === "shop" && tb?.kind === "takeaway" && !tb?.kiosk;
+    if (inf) I18N.keep([inf.store_name]); // 店名原样（「XX 餐厅」不变成「XX 商家」）
+  }
+  await I18N.init(customerToken ? { defaultLang: navLang || phoneLang(pre?.customer_lang || "fr"), defaultMode: "single", subset: true, vocab: shopVocab ? "shop" : null } : { subset: true });
+  I18N.mountSwitcher($("#langFloat"));
+  // 顶栏右边给语言按钮留的宽度（按钮宽度随语言变：「FR」「FR+中」）；换语言会整页刷新，所以量一次 + 窗口变化时再量
+  const fitLangW = () => { const w = $("#langFloat")?.offsetWidth; if (w) document.documentElement.style.setProperty("--langw", w + "px"); };
+  fitLangW(); addEventListener("resize", fitLangW);
+  // 切换语言会刷新页面：先把购物车存起来，刷新后恢复
+  I18N.onBeforeSwitch(() => {
+    try { sessionStorage.setItem(CART_KEY, JSON.stringify({ cart: [...S.cart], note: S.orderNote, table: S.table?.id || null })); } catch {}
+  });
+  const info = await infoP;
+  if (info) {
+    setMoneyFormat(info);
+    S.storeName = info.store_name;
+    S.remote = Boolean(info.remote); // 从外网地址打开（顾客不在店里）：外带单要填姓名、电话、取餐时间
+    S.onlinePay = info.online_pay || null; // 网上付款：{ mode: optional | required }
+    S.remoteNeed = info.remote_need || { name: true, phone: true }; // 网上预订要不要必须填姓名、电话
+    applyInfo(info);
+    S.gway = info.gway || null;
+    S.shopStyle = info.shop_style === "shop"; // 电商版（网上点餐链接、店内外带码用；桌贴码、点餐机照旧）
+    S.delivery = info.delivery && (info.delivery.local || info.delivery.ship) ? info.delivery : null; // 网上订单的配送：本店送货 / 快递邮寄
+    document.title = info.store_name + " 点餐";
+  }
+  if (customerToken) {
+    try {
+      await Promise.all([loadMenu(), loadOrdered()]);
+      await loadShared().catch(() => { SC = null; }); // v1.26：桌贴码 → 同桌共享购物车（连不上就先各点各的）
+    } catch (e) {
+      app.innerHTML = `<div class="notice"><div style="font-size:40px">😕</div>${esc(e.message)}</div>`;
+      return;
+    }
+    restoreCart();
+    if (SC) scSync(); // 切换语言前还没发出去的菜
+    const v = location.hash.match(/^#v=(\w+)/);
+    // 从付款页跳回来：?v=凭证&paid=1|0
+    const qs = new URLSearchParams(location.search);
+    const back = qs.get("v");
+    if (S.takeaway && back && /^\w+$/.test(back)) {
+      // 页面内输卡号做 3D 验证后，Stripe 跳回时带 redirect_status：failed = 没付成（付款整改 P5，以前也显示「已收到付款」）
+      const rs = qs.get("redirect_status");
+      const paid = rs === "failed" ? "0" : qs.get("paid");
+      for (const k of ["v", "paid", "redirect_status", "payment_intent", "payment_intent_client_secret"]) qs.delete(k);
+      history.replaceState(null, "", location.pathname + "?" + qs.toString());
+      // 付完跳回（paid=1）但店里还没确认到账：先显示「正在确认付款结果…」，每几秒问一次（是否付款以服务端向支付平台查询为准，查到已付才说收到）
+      if (paid === "1") S.payWait = back;
+      await showVoucher(back, { sync: true });
+      if (S.payWait && S.voucher?.status === "unpaid") pollPaid(back); else S.payWait = null;
+      if (paid === "0" && S.voucher?.status === "unpaid") toast(I18N.t(rs === "failed" ? "付款没有成功，请重新付款" : "付款没有完成，可以重新付款"), "error");
+      if (S.voucher?.status === "paid") toast(I18N.t("付款成功，餐厅开始为您准备"), "success");
+    } else if (S.takeaway && v) await showVoucher(v[1]);
+    // 外带扫码合并到 Gway 商城：直接打开商城本店页面（地址带 ?local=1 时留在店里的点餐页，店员调试用）
+    else if (S.takeaway && !S.kiosk && !S.instore && S.gway?.redirect && !new URLSearchParams(location.search).has("local")) { app.innerHTML = `<div class="notice"><div style="font-size:40px">🛒</div>${esc(I18N.t("正在打开 Gway 商城…"))}</div>`; location.replace(S.gway.url); return; }
+    else if (needGuests()) showGuests();
+    else renderMenu();
+    if (customerToken && S.remote) setInterval(checkHours, 60000);
+    // 电商版：每个产品有自己的链接（#p=编号），打开就是这个产品的详情页
+    const pd = shopLayout() && (location.hash.match(/^#p=(\d+)$/) || [null, params.get("p")]);
+    if (pd && pd[1] && itemById(Number(pd[1]))) openProduct(Number(pd[1]), { push: false });
+    if (S.kiosk) startKiosk();
+    startLive();
+  } else {
+    if (store.get("pos_token")) {
+      try {
+        S.staff = await api("/api/auth/me");
+        if (S.staff.must_change_pin) return openPinChange({ role: S.staff.role }); // 店长默认 / 弱 PIN：先改 PIN（D-01）
+        return showTables();
+      } catch {}
+    }
+    app.innerHTML = `<div class="login-screen"><div class="login-card"><h1>服务员点单</h1><div class="muted">请输入员工 PIN</div><div id="pad"></div></div></div>`;
+    mountPinLogin($("#pad"), (staff) => { S.staff = staff; showTables(); });
+  }
+}
+
+// 实时同步要在拿到桌台 token 或登录之后再开，否则未登录时刷新数据会 401
+let liveStarted = false;
+function startLive() {
+  if (!liveStarted) { liveStarted = true; live = connectLive(onLive); }
+}
+
+let liveTimer, liveTypes = new Set(), liveFirstAt = 0;
+// 200 毫秒内来的几条消息合在一起处理（记住每一种：改设置时会同时来 settings 和 gway，不能只看最后一条）
+// 最多等 1 秒（高峰时消息一直来，不能一直往后推，v1.25.1）。手机在后台也照样刷新：「做好了响铃提醒我」要能响
+function onLive(msg) {
+  // v1.26 共享购物车：这桌的购物车变了（只发给这桌的手机）；收银台用的 table_draft 不用管
+  if (msg.type === "cart") return onCartMsg(msg);
+  if (msg.type === "table_draft") return;
+  if (msg.type === "reconnected" && SC) { SC.subKey = null; scSubscribe(); scFetch(0); }
+  liveTypes.add(msg.type);
+  scheduleLive();
+}
+function scheduleLive() {
+  if (!liveTypes.size) return;
+  const now = Date.now();
+  if (!liveFirstAt) liveFirstAt = now;
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(async () => {
+    liveFirstAt = 0;
+    const types = liveTypes; liveTypes = new Set();
+    const has = (t) => types.has(t);
+    if (S.voucherToken) return loadVoucher().then(renderVoucher).catch(() => {});
+    if (document.querySelector(".kiosk-done")) return; // 平板正在显示取餐号，不要刷回菜单
+    if (has("menu") || has("reconnected")) { S.lastTrim = null; await loadMenu().catch(() => {}); notifyTrim(S.lastTrim && S.lastTrim[0]); }
+    // 店里改了广告图、暂停 / 恢复网上接单：马上更新
+    if (customerToken && (has("settings") || has("reconnected"))) {
+      const wasClosed = S.closed;
+      const before = JSON.stringify([S.banners, S.closed]);
+      const info = await api("/api/public/info", { auth: false }).catch(() => null);
+      if (info) applyInfo(info);
+      if (JSON.stringify([S.banners, S.closed]) !== before) {
+        if (Boolean(wasClosed) !== Boolean(S.closed)) toast(I18N.t(S.closed ? "本店已打烊，现在只能浏览" : "本店已恢复网上接单"), S.closed ? "info" : "success");
+        if ($("#menuItems")) app.innerHTML = ""; // 广告图、打烊提示变了：整页重画
+      }
+    }
+    if (S.table || customerToken) { await loadOrdered().catch(() => {}); refreshOrdered(); }
+    // 店里开 / 关了同桌共享购物车
+    if (customerToken && !S.takeaway && has("settings")) { const was = Boolean(SC); await loadShared().catch(() => {}); if (!was && SC) scSync(); }
+    if (!customerToken && !S.table && S.staff) return showTables();
+    if (document.querySelector(".closed-page, .guests-page")) return; // 正在显示打烊页 / 问几位用餐，不要刷成菜单
+    if (S.table || customerToken) renderMenu();
+  }, Math.max(0, Math.min(200, liveFirstAt + 1000 - now)));
+}
+
+// 切换语言前保存的购物车
+function restoreCart() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(CART_KEY) || "null");
+    sessionStorage.removeItem(CART_KEY);
+    if (!saved) return;
+    for (const [k, line] of saved.cart) if (S.items.some((i) => i.id === line.id)) S.cart.set(k, line);
+    S.orderNote = saved.note || "";
+  } catch {}
+  trimCart();
+}
+
+// ---------- 数据 ----------
+async function loadMenu() {
+  if (customerToken) {
+    const m = await (takePrefetch("menu") || api("/api/public/menu", { auth: false }));
+    S.categories = m.categories; S.items = m.items;
+    // 电商版换中性词时，商品名、分类、介绍、规格这些店家自己填的字原样保留
+    I18N.keep([...m.categories.map((c) => c.name), ...m.items.flatMap((i) => [i.name, i.description, ...(i.options || []).flatMap((g) => [g.name, ...(g.choices || []).map((c) => c.name)])])]);
+    S.notePresets = m.note_presets || [];
+    // 欧盟 14 类过敏原：图标 + 名字；开了提醒才显示
+    S.allergens = m.allergen_notice ? new Map((m.allergen_list || []).map((a) => [a.code, a])) : null;
+    S.storePhone = m.store_phone || "";
+    S.hot = m.hot || [];
+  } else {
+    const [categories, items, st, hot] = await Promise.all([api("/api/menu/categories"), api("/api/menu/items"), api("/api/settings"), api("/api/menu/hot").catch(() => [])]);
+    S.categories = categories; S.items = items;
+    S.notePresets = st.note_presets || [];
+    S.hot = hot;
+    S.askGuests = Boolean(st.ask_guests);
+  }
+  S.categories = S.categories.filter((c) => S.items.some((i) => i.category_id === c.id));
+  // 下架的菜从购物车移除；限量的菜：购物车超过还剩的份数就改小（卖完的去掉）
+  for (const [key, line] of S.cart) if (!S.items.some((i) => i.id === line.id)) S.cart.delete(key);
+  trimCart();
+  if (!menuCats().some((c) => c.id === S.cat)) S.cat = menuCats()[0]?.id;
+}
+
+async function loadOrdered() {
+  if (customerToken) {
+    const r = await (takePrefetch("table") || api(`/api/public/tables/${encodeURIComponent(customerToken)}`, { auth: false }));
+    S.table = { table_no: r.table_no };
+    S.takeaway = r.kind === "takeaway";
+    S.kiosk = r.kiosk || null; // 店里的平板点餐机
+    S.dineChoice = Boolean(r.dine_choice); // 在店里点外带（扫外带码、平板点餐机）：问「在这里吃 / 打包」
+    S.expireMinutes = r.expire_minutes || 30;
+    S.ordered = S.takeaway ? null : r.order;
+    S.askGuests = Boolean(r.ask_guests);
+    // 店里的码（桌贴码、店内外带码）：从外网打开（没连 WiFi）也按店内点餐：不用填电话、不受网上接单时间限制、到前台付款
+    S.instore = r.kind === "dine_in" || Boolean(r.instore);
+    if (S.instore) { S.remote = false; S.onlinePay = null; S.closed = null; }
+  } else {
+    const o = await api(`/api/orders/table/${S.table.id}/open`);
+    S.ordered = o && { id: o.id, note: o.note, items: o.items.map((i) => ({ menu_item_id: i.menu_item_id, name: i.name_at_order, options_text: i.options_text, note: i.note, qty: i.qty, price_cents: i.price_cents })), subtotal_cents: o.subtotal_cents };
+  }
+}
+
+// ---------- 服务员：选桌 ----------
+async function showTables() {
+  startLive();
+  S.table = null; S.cart.clear();
+  const tables = await api("/api/tables");
+  const label = { idle: "空闲", occupied: "用餐中", billing: "待结账", dirty: "待清台" };
+  app.innerHTML = `
+    <div class="head"><h1>${esc(S.staff.name)} · 选择桌台</h1><button id="out">退出</button></div>
+    <div id="tableList">${[...new Set(tables.map((t) => t.area))].map((area) => `
+      <div class="area-title">${esc(area)}</div>
+      <div class="tables">${tables.filter((t) => t.area === area).map((t) => `<button class="s-${t.status}" data-t="${t.id}">${esc(t.table_no)}<small>${label[t.status]} · ${t.item_count ? `${t.item_count}份` : `${t.seats}人`}</small></button>`).join("")}</div>`).join("")}
+    </div>`;
+  $("#out").onclick = async () => { try { await api("/api/auth/logout", { method: "POST" }); } catch {} store.set("pos_token", null); reloadPage(); };
+  $("#tableList").onclick = async (e) => {
+    const b = e.target.closest("[data-t]");
+    if (!b) return;
+    S.table = tables.find((t) => t.id === Number(b.dataset.t));
+    try { await Promise.all([loadMenu(), loadOrdered()]); restoreCart(); S.guests = null; needGuests() ? showGuests() : renderMenu(); } catch (err) { toast(err.message, "error"); }
+  };
+}
+
+// ---------- 点菜 ----------
+// 购物车：key（菜品 + 所选规格 + 备注）→ { id, options, note, qty }；同一道菜规格或备注不同就是不同的行
+const itemById = (id) => S.items.find((i) => i.id === id);
+
+// ---------- 限量的菜（剩几份）----------
+// 一份要用掉哪些菜：菜本身 1 份 + 套餐里选的每道菜各 1 份（和服务端扣份数的规则一样）
+function unitsOf(item, options = []) {
+  const m = new Map([[item.id, 1]]);
+  for (const s of options || []) {
+    const g = (item.options || []).find((x) => x.name === s.group);
+    const c = g && g.choices.find((x) => x.name === s.choice);
+    if (c && c.item_id) m.set(c.item_id, (m.get(c.item_id) || 0) + 1);
+  }
+  return m;
+}
+// 每道菜还剩几份（null = 不限量）：菜单上的菜看 left；套餐里的菜不在菜单上时看选项上的 left
+function stockLeft(id) {
+  const i = itemById(id);
+  if (i) return i.left == null ? null : i.left;
+  for (const x of S.items) for (const g of x.options || []) for (const c of g.choices || []) if (c.item_id === id && c.left != null) return c.left;
+  return null;
+}
+// 购物车里已经用掉几份（skipKey：不算这一行）
+function cartUsage(skipKey) {
+  const used = new Map();
+  for (const [k, l] of S.cart) {
+    if (k === skipKey) continue;
+    const i = itemById(l.id);
+    if (!i) continue;
+    for (const [id, per] of unitsOf(i, l.options)) used.set(id, (used.get(id) || 0) + per * l.qty * (l.weight || 1));
+  }
+  // 共享购物车：别的手机加的也占份数（限量的菜全桌一起算，「+」不能加超）。
+  // 份数变少时只按自己的改（trimCart）：几台手机各自都把别人的算进去会一起改小、改过头，全桌的由服务器下单时统一改
+  for (const l of SC && !S.trimming ? SC.others : []) {
+    const i = itemById(l.menu_item_id);
+    if (!i) continue;
+    for (const [id, per] of unitsOf(i, l.options)) used.set(id, (used.get(id) || 0) + per * l.qty);
+  }
+  return used;
+}
+// 按这个规格还能再加几份（Infinity = 不限）；limitId 是挡住的那道菜
+function maxAdd(item, options = [], skipKey = null, weight = null) {
+  if (item.sold_out) return { max: 0, limitId: item.id };
+  const used = cartUsage(skipKey);
+  let max = Infinity, limitId = null;
+  for (const [id, per] of unitsOf(item, options)) {
+    const left = stockLeft(id);
+    if (left == null) continue;
+    const n = Math.max(0, Math.floor((left - (used.get(id) || 0) + 1e-9) / (per * (weight || 1))));
+    if (n < max) { max = n; limitId = id; }
+  }
+  return { max, limitId };
+}
+// 「只剩 N 份」/「已售完」提示（N = 挡住的那道菜还剩几份）
+function stockToast(limitId) {
+  const left = stockLeft(limitId);
+  toast(I18N.t(left > 0 ? `只剩 ${left} 份` : "已售完"), "error");
+}
+// 购物车按现在的份数改小（卖完的、套餐里选的菜卖完的去掉）；返回改动了几行
+// 改掉的行记在 S.lastTrim：[{ name, left }]（实时同步时提示顾客，和提交时被买走的提示一样）
+function trimCart() {
+  S.trimming = true;
+  try { return trimCartMine(); } finally { S.trimming = false; }
+}
+function trimCartMine() {
+  let changed = 0;
+  const trimmed = [];
+  const lines = [...S.cart];
+  S.cart = new Map();
+  for (const [k, l] of lines) {
+    const i = itemById(l.id);
+    if (!i) { changed++; continue; }
+    let soldChoice = null;
+    for (const s of l.options || []) { const g = (i.options || []).find((x) => x.name === s.group); const c = g && g.choices.find((x) => x.name === s.choice); if (c && c.sold_out) soldChoice = c; }
+    const fit = soldChoice ? 0 : Math.min(l.qty, maxAdd(i, l.options, null, l.weight).max);
+    if (fit !== l.qty) { changed++; trimmed.push(soldChoice ? { name: soldChoice.name, left: 0 } : { name: i.name, left: i.left != null && i.left < l.qty ? i.left : fit }); }
+    if (fit > 0) S.cart.set(k, Object.assign({}, l, { qty: fit }));
+  }
+  S.lastTrim = trimmed;
+  if (changed) scSync();
+  return changed;
+}
+// 实时同步发现购物车里的菜不够了（别人刚点走）：和提交时一样的提示；购物车弹层开着就在弹层里说
+function notifyTrim(t) {
+  if (!t) return;
+  const head = I18N.t(t.left > 0 ? `「${t.name}」只剩 ${t.left} 份` : `「${t.name}」已经卖完了`);
+  const tail = I18N.t(t.left > 0 ? "已帮您改好购物车，请确认后再提交" : "已从购物车里去掉，请确认后再提交");
+  if (typeof S.onCartTrim === "function" && S.onCartTrim(t)) return;
+  toast(head + " " + tail, "error");
+}
+
+function addToCart(item, options = [], qty = 1, note = "", weight = null) {
+  if (S.closed) { toast(I18N.t("已打烊，现在只能浏览，开门后再下单"), "info"); return 0; }
+  const key = cartKey(item.id, options) + "#" + note + (weight ? "@" + weight : "");
+  const line = S.cart.get(key) || { id: item.id, options, note, qty: 0, ...(weight ? { weight } : {}) };
+  const { max, limitId } = maxAdd(item, options, null, weight);
+  const add = Math.min(qty, max, 99 - line.qty);
+  if (add < qty && limitId != null) stockToast(limitId);
+  if (add <= 0) return 0;
+  line.qty += add;
+  if (!line.lid) line.lid = newLid(); // 共享购物车里这一行的编号
+  S.cart.set(key, line);
+  scSync();
+  return add;
+}
+
+function changeLine(key, delta) {
+  const line = S.cart.get(key);
+  if (!line) return;
+  if (delta > 0) {
+    const item = itemById(line.id);
+    const r = item ? maxAdd(item, line.options, null, line.weight) : { max: Infinity, limitId: null };
+    if (r.max < delta) { if (r.limitId != null) stockToast(r.limitId); return; }
+  }
+  line.qty = Math.min(99, line.qty + delta);
+  if (line.qty <= 0) S.cart.delete(key);
+  scSync();
+}
+
+const itemQty = (id) => [...S.cart.values()].filter((l) => l.id === id).reduce((s, l) => s + l.qty, 0);
+
+function cartTotals() {
+  let count = 0, total = 0;
+  for (const l of S.cart.values()) {
+    const i = itemById(l.id);
+    if (i) { count += l.qty; total += linePrice(i, l) * l.qty; }
+  }
+  // 共享购物车：全桌一起算
+  for (const l of SC ? SC.others : []) {
+    const i = itemById(l.menu_item_id);
+    if (i) { count += l.qty; total += unitPrice(i, l.options) * l.qty; }
+  }
+  return { count, total };
+}
+
+// ---------- 开台前先问几位用餐（设置里开了才问；这张桌已经有单就不问） ----------
+const needGuests = () => !S.takeaway && S.askGuests && !S.ordered && !S.guests && !(SC && SC.head); // 共享购物车：别的手机已经答过就不问
+function showGuests() {
+  window.scrollTo(0, 0);
+  app.innerHTML = `<div class="guests-page">
+    <div class="head">${customerToken ? "" : `<button id="back">‹ 桌台</button>`}<h1 id="storeTitle">${esc(S.storeName)}</h1><span class="tno">${esc(S.table.table_no)} 桌</span></div>
+    ${bannerHtml()}
+    <div class="gp-card">
+      <h2>欢迎光临，请问几位用餐？</h2>
+      <div class="gp-grid">${Array.from({ length: 12 }, (_, i) => `<button data-g="${i + 1}">${i + 1}</button>`).join("")}</div>
+      <div class="gp-more"><input type="number" id="gMore" min="1" max="99" inputmode="numeric" placeholder="13 位以上"><button class="btn primary" id="gGo">好的</button></div>
+    </div></div>`;
+  startBanner();
+  $("#back")?.addEventListener("click", showTables);
+  const go = (n) => { if (!Number.isInteger(n) || n < 1 || n > 99) return toast(I18N.t("请选人数"), "error"); S.guests = n; if (SC) { SC.headLocal = n; scSync(); } app.innerHTML = ""; renderMenu(); };
+  app.querySelector(".gp-grid").onclick = (e) => { const b = e.target.closest("[data-g]"); if (b) go(Number(b.dataset.g)); };
+  $("#gGo").onclick = () => go(Number($("#gMore").value));
+}
+
+// ---------- 顶部广告图、网上预订打烊页 ----------
+function applyInfo(info) {
+  if (info.theme && window.applyTheme) window.applyTheme(info.theme); // 店里改了系统颜色：马上跟着变
+  if (customerToken && window.StoreTheme) StoreTheme.set(info.site_theme || ""); // 点餐页 / 网上商城主题（"" = 默认样子）
+  S.banners = customerToken ? info.banners || [] : [];
+  S.closed = S.instore ? null : info.remote_closed || null; // { reason: paused | hours, hours, week, message }；店里的码不受网上接单时间限制
+  S.storePhone = info.store_phone || S.storePhone || "";
+}
+function bannerHtml() {
+  if (!S.banners?.length) return "";
+  return `<div class="banner" id="banner" aria-label="广告"><div class="bn-track">${S.banners.map((src) => `<img src="${esc(src)}" alt="" draggable="false">`).join("")}</div>
+    ${S.banners.length > 1 ? `<div class="bn-dots">${S.banners.map((_, i) => `<span class="${i ? "" : "on"}"></span>`).join("")}</div>` : ""}</div>`;
+}
+// 每 4 秒换一张；手指滑动也可以换，滑动后停 8 秒再继续
+let bannerTimer = null;
+function startBanner() {
+  clearInterval(bannerTimer);
+  const box = $("#banner");
+  if (!box || S.banners.length < 2) return;
+  const track = $(".bn-track", box);
+  let pausedUntil = 0;
+  const idx = () => Math.round(track.scrollLeft / track.clientWidth);
+  const dots = () => box.querySelectorAll(".bn-dots span").forEach((d, i) => d.classList.toggle("on", i === idx()));
+  track.addEventListener("scroll", () => requestAnimationFrame(dots), { passive: true });
+  track.addEventListener("touchstart", () => (pausedUntil = Date.now() + 8000), { passive: true });
+  bannerTimer = setInterval(() => {
+    if (!document.body.contains(track)) return clearInterval(bannerTimer);
+    if (Date.now() < pausedUntil || document.hidden) return;
+    const next = (idx() + 1) % S.banners.length;
+    const calm = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    track.scrollTo({ left: next * track.clientWidth, behavior: next && !calm ? "smooth" : "auto" });
+  }, 4000);
+}
+// 打烊 / 暂停网上接单：菜单照常能看，顶部一条提示（几点开门、店主的话、电话），不能加菜、不能下单
+const WEEK_OPEN = { 周日: "周日 {0} 开门", 周一: "周一 {0} 开门", 周二: "周二 {0} 开门", 周三: "周三 {0} 开门", 周四: "周四 {0} 开门", 周五: "周五 {0} 开门", 周六: "周六 {0} 开门" };
+function closedBarHtml() {
+  const c = S.closed;
+  if (!c) return "";
+  const n = c.reason === "hours" ? c.next_open : null;
+  const next = !n ? "" : n.in_days === 0 ? `今天 ${n.time} 开门` : n.in_days === 1 ? `明天 ${n.time} 开门` : (WEEK_OPEN[n.day] || "{0}").replace("{0}", n.time);
+  return `<div class="closed-bar" role="status">${ICON.moon}<div>
+    <b>${c.reason === "hours" ? "本店已打烊" : "今日暂停网上接单"}</b>
+    ${next ? `<span>${esc(next)}</span>` : ""}<span>现在只能浏览，不能下单</span>
+    ${c.message ? `<span class="cb-msg">${esc(c.message)}</span>` : ""}
+    ${S.storePhone ? `<span>电话：<a class="num" translate="no" href="tel:${esc(S.storePhone.replace(/\s+/g, ""))}">${esc(S.storePhone)}</a></span>` : ""}
+  </div></div>`;
+}
+// 网上点餐页每分钟问一次接单状态：到了打烊 / 开门时间不用刷新页面
+function closedChanged(wasClosed) {
+  if (Boolean(wasClosed) === Boolean(S.closed)) return;
+  toast(I18N.t(S.closed ? "本店已打烊，现在只能浏览" : "本店已恢复网上接单"), S.closed ? "info" : "success");
+  if ($("#menuItems")) { app.innerHTML = ""; renderMenu(); }
+}
+async function checkHours() {
+  if (document.hidden || S.voucherToken || !$("#menuItems")) return;
+  const info = await api("/api/public/info", { auth: false }).catch(() => null);
+  if (!info) return;
+  const was = S.closed;
+  applyInfo(info);
+  closedChanged(was);
+}
+
+// 菜单页：一次只显示一个分类（500 道菜也不会拉得很长）；最前面是「🔥 热销」（最近 30 天卖得最多的）。
+// 页面框架（标题、搜索框、分类栏、购物车条）只画一次，之后打字、加减菜、换分类只更新列表和购物车条：
+// 搜索框不会被换掉，手机中文输入法打字不会被打断，500 道菜也不卡
+const HOT = "hot";
+const hotItems = () => (S.hot || []).map(itemById).filter(Boolean).slice(0, 12);
+function menuCats() {
+  const hot = hotItems();
+  return [...(hot.length >= 3 || hot.some((i) => i.featured) ? [{ id: HOT, name: "热销" }] : []), ...S.categories.map((c) => ({ id: c.id, name: c.name }))];
+}
+const catItems = (id) => (id === HOT ? hotItems() : S.items.filter((i) => i.category_id === id));
+const catLabel = (c) => `${c.id === HOT ? ICON.flame : ""}<span>${esc(c.name)}</span>`;
+const catName = (cid) => S.categories.find((c) => c.id === cid)?.name || "";
+
+// isShop：电商版的说法和流程（购物车、去结账、件）只给外带码 / 网上点餐；
+// shopLayout：电商版的版式（方格、分区下拉、商品详情页）——店主 10-26「按点餐版和电商版统一，选哪个就是哪个」，桌贴码也跟着走（说法照旧：选好了、份、几桌）
+const isShop = () => Boolean(S.shopStyle && S.takeaway && !S.kiosk && customerToken);
+const shopLayout = () => Boolean(S.shopStyle && !S.kiosk && customerToken);
+function renderMenu() {
+  document.body.classList.toggle("is-closed", Boolean(S.closed));
+  if ($("#pdPage")) renderPdBar();
+  if (!$("#menuItems")) return renderMenuShell();
+  const input = $("#dishSearch");
+  if (input && input.value !== S.q && document.activeElement !== input) input.value = S.q;
+  if ($("#clearSearch")) $("#clearSearch").hidden = !S.q;
+  renderNav();
+  renderList();
+  renderCartBar();
+}
+
+function renderMenuShell() {
+  document.body.classList.toggle("shop", shopLayout());
+  if (shopLayout()) return renderShopShell();
+  app.innerHTML = `
+    <div class="head">
+      ${customerToken ? "" : `<button id="back">‹ 桌台</button>`}
+      <h1 id="storeTitle">${esc(S.storeName)}</h1><span class="tno">${S.kiosk ? "自助点餐" : S.takeaway ? "外带自提" : esc(S.table.table_no) + " 桌"}</span>
+    </div>
+    ${typeof bannerHtml === "function" ? bannerHtml() : ""}
+    ${closedBarHtml()}
+    ${S.takeaway && !S.kiosk && S.gway?.url ? `<a class="gway-link" href="${esc(S.gway.url)}"><b>${ICON.bag} Gway</b><span>${esc(I18N.t("在 Gway 商城下单：网上付款，还可以外送到家"))}</span><i>${ICON.chevron}</i></a>` : ""}
+    <div class="search-bar"><input type="search" id="dishSearch" value="${esc(S.q)}" placeholder="拼音首字母搜菜，如 gbjd = 宫保鸡丁" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"><button id="clearSearch" aria-label="清空" ${S.q ? "" : "hidden"}>×</button></div>
+    <div class="menu"><nav class="cats" id="menuNav"></nav><div class="items" id="menuItems"></div></div>
+    <div class="cartbar" id="cartBar"></div>`;
+  layoutMenu();
+  if (typeof startBanner === "function") startBanner();
+  $("#back")?.addEventListener("click", showTables);
+  const input = $("#dishSearch");
+  // 中文输入法拼写过程中（还没选字）也跟着搜：列表更新不会碰到输入框
+  input.addEventListener("input", () => setSearch(input.value));
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
+  $("#clearSearch").addEventListener("click", () => { input.value = ""; setSearch(""); });
+  renderNav();
+  renderList();
+  renderCartBar();
+}
+
+function setSearch(q) {
+  if (q === S.q) return;
+  S.q = q;
+  $("#clearSearch").hidden = !q;
+  renderNav();
+  renderList();
+  scrollToList();
+}
+
+// 列表回到顶部（顶部广告已经滑走了就不再露出来）
+function scrollToList() {
+  const menu = $(".menu");
+  if (!menu) return;
+  const target = Math.max(0, menu.getBoundingClientRect().top + window.scrollY - topOffset());
+  if (window.scrollY > target) window.scrollTo(0, target);
+}
+
+function renderNav() {
+  const nav = $("#menuNav");
+  if (!nav) return;
+  const searching = Boolean(S.q.trim());
+  const keep = nav.scrollTop;
+  const count = (id) => (id === HOT ? 0 : S.items.filter((i) => i.category_id === id).reduce((s, i) => s + itemQty(i.id), 0));
+  nav.innerHTML = menuCats().map((c) => {
+    const n = count(c.id);
+    return `<button data-cat="${c.id}" class="${c.id === S.cat && !searching ? "on" : ""}">${catLabel(c)}${n ? `<span class="n">${n}</span>` : ""}</button>`;
+  }).join("");
+  nav.scrollTop = keep;
+  applyCatFit(nav); // 套用量好的字号（不排版）
+  requestAnimationFrame(() => fitCats(nav)); // 等翻译换好文字；语言、宽度、分类都没变时什么都不量
+  $(".menu").classList.toggle("searching", searching);
+  const on = nav.querySelector(".on");
+  if (on) {
+    if (on.offsetTop < nav.scrollTop) nav.scrollTop = on.offsetTop;
+    else if (on.offsetTop + on.offsetHeight > nav.scrollTop + nav.clientHeight) nav.scrollTop = on.offsetTop + on.offsetHeight - nav.clientHeight;
+  }
+}
+
+// 分类栏：某个分类名里有一个词比按钮还宽 → 只把这个按钮的字一档一档缩小（最小 11px），不在词中间断开；
+// 还放不下就加连字符断词（.hy）。量出来的结果按「语言 + 分类栏宽度 + 分类名」记住：点「+」重画分类栏时
+// 直接套用记住的字号，不再量（量一次要重新排版）；先统一写、再统一读，一轮只排版一次
+const catFit = { sig: "", sizes: new Map(), runs: 0 }; // runs：真正量了几次（测试用）
+function applyCatFit(nav) {
+  for (const b of nav.querySelectorAll("button[data-cat]")) {
+    const f = catFit.sizes.get(b.dataset.cat);
+    if (!f) continue;
+    if (f.fs) b.style.fontSize = f.fs + "px";
+    if (f.hy) { b.classList.add("hy"); const t = b.querySelector(":scope > span:not(.n)"); if (t) { t.lang = I18N.lang; b.title = t.textContent; } }
+  }
+}
+function fitCats(nav) {
+  const btns = [...nav.querySelectorAll("button[data-cat]")];
+  const sig = [I18N.lang, nav.clientWidth, ...menuCats().map((c) => c.id + ":" + c.name)].join("|");
+  if (sig === catFit.sig) return applyCatFit(nav);
+  catFit.sig = sig; catFit.sizes.clear(); catFit.runs++;
+  const rows = btns.map((b) => ({ b, t: b.querySelector(":scope > span:not(.n)") })).filter((r) => r.t);
+  for (const r of rows) { r.b.style.fontSize = ""; r.b.classList.remove("hy"); } // 写
+  const base = rows.length ? parseFloat(getComputedStyle(rows[0].b).fontSize) : 13;
+  const over = (r) => r.t.scrollWidth > r.t.clientWidth + 0.5;
+  let bad = rows.filter(over); // 读（一次排版）
+  for (let fs = base - 0.5; bad.length && fs >= 11; fs -= 0.5) {
+    for (const r of bad) { r.b.style.fontSize = fs + "px"; catFit.sizes.set(r.b.dataset.cat, { fs }); } // 只改放不下的那几个
+    bad = bad.filter(over);
+  }
+  for (const r of bad) { r.t.lang = I18N.lang; r.b.classList.add("hy"); r.b.title = r.t.textContent; catFit.sizes.set(r.b.dataset.cat, { fs: 11, hy: true }); }
+}
+let catFitTimer = null;
+window.addEventListener("resize", () => { clearTimeout(catFitTimer); catFitTimer = setTimeout(() => { const n = $("#menuNav"); if (n) fitCats(n); }, 150); });
+
+// ---- 超市 / 百货的商品（v1.38.3）：多规格一款一张卡片、称重的选重量 ----
+const isGoods = (i) => Boolean(i && i.kind === "goods");
+const goodsName = (i) => (i.variant ? `${i.name} ${i.variant}` : i.name);
+const lineName = (i) => (isGoods(i) ? goodsName(i) : i.name);
+const groupRows = (i) => (isGoods(i) ? S.items.filter((x) => x.group === i.group) : [i]);
+// 一款只留一张卡片：用整款那一行（整款下架了用这一款的第一个规格）
+function uniqGroups(list) {
+  const seen = new Set(), out = [];
+  for (const i of list) {
+    if (!isGoods(i)) { out.push(i); continue; }
+    if (seen.has(i.group)) continue;
+    seen.add(i.group);
+    const rows = groupRows(i);
+    out.push(rows.find((x) => x.id === i.main_id) || rows[0]);
+  }
+  return out;
+}
+// 要先进详情页选的：多规格（选颜色尺码）、称重（选重量）
+const needsPick = (i) => isGoods(i) && (i.weighed || groupRows(i).length > 1);
+const WEIGHTS = [0.25, 0.5, 1, 2];
+const fmtKg = (w) => (w < 1 ? `${Math.round(w * 1000)} g` : `${+Number(w).toFixed(3)} kg`);
+const linePrice = (i, l) => (l.weight ? Math.round(i.price_cents * l.weight) : unitPrice(i, l.options));
+const goodsPrice = (i) => (i.weighed ? `${money(i.price_cents)}<small>/kg</small>` : priceHtml(i));
+function dishControl(i) {
+  if (needsPick(i)) {
+    const q = groupRows(i).reduce((s, x) => s + itemQty(x.id), 0);
+    return S.closed ? "" : groupRows(i).every((x) => x.sold_out) ? `<span class="so-tag">已售完</span>`
+      : `<button type="button" class="spec" data-pdopen="${i.id}" aria-label="选规格">${ICON.plus}${q ? `<span class="n">${q}</span>` : ""}</button>`;
+  }
+  return plainControl(i);
+}
+function plainControl(i) {
+  const q = itemQty(i.id);
+  const key = cartKey(i.id, []) + "#";
+  // 限量：卖完 = 灰色「已售完」，没有「+」；加满了「+」变淡（点了提示只剩几份）
+  const capped = !i.sold_out && !hasOptions(i) && maxAdd(i, []).max < 1;
+  // 有规格的菜也是一个「+」：点了弹出选规格（右上角小圆点 = 已点几份）
+  return S.closed ? ""
+    : i.sold_out
+    ? `${q ? `<button type="button" class="minus" data-dec="${esc(key)}" aria-label="减少">${ICON.minus}</button><span class="q">${q}</span>` : ""}<span class="so-tag">已售完</span>`
+    : hasOptions(i)
+    ? `<button type="button" class="spec" data-spec="${i.id}" aria-label="选规格">${ICON.plus}${q ? `<span class="n">${q}</span>` : ""}</button>`
+    : `${q ? `<button type="button" class="minus" data-dec="${esc(key)}" aria-label="减少">${ICON.minus}</button><span class="q">${q}</span>` : ""}<button type="button" class="plus ${capped ? "capped" : ""}" data-inc="${i.id}" aria-label="加一份" ${capped ? 'aria-disabled="true"' : ""}>${ICON.plus}</button>`;
+}
+function dishHtml(i, showCat) {
+  const control = dishControl(i);
+  const low = !i.sold_out && i.left != null && i.left > 0 && i.left <= 3 ? `<span class="low-badge">只剩 ${i.left} 份</span>` : "";
+  // 没有图片的菜：同样的排版，只是左边没有图（不放占位图）
+  const meta = [showCat ? catName(i.category_id) : "", optionsSummary(i)].filter(Boolean).join(" · ");
+  return `<div class="dish ${i.image ? "has-img" : "compact"} ${i.featured ? "is-hot" : ""} ${i.sold_out ? "sold-out" : ""}">${i.image ? `<button type="button" class="thumb-btn" data-zoom="${i.id}" aria-label="看大图">${thumbHtml(i)}${featuredTag(i)}<span class="zoom-hint" aria-hidden="true">${ICON.expand}</span></button>` : ""}
+    <div class="info"><div class="name">${i.image ? "" : featuredTag(i)}${i.code ? `<span class="code" translate="no">${esc(i.code)}</span>` : ""}${esc(i.name)}</div>
+      ${meta ? `<div class="meta item-opts">${esc(meta)}</div>` : ""}
+      ${allergenIcons(i)}
+      <div class="dish-foot"><div class="price num">${priceHtml(i)}${hasOptions(i) ? '<small> 起</small>' : ""}</div>${low}
+        <div class="stepper">${control}</div></div></div></div>`;
+}
+// 店长标的爆款：顾客页显示「招牌」小标（保留 .hot-badge 类名）
+const featuredTag = (i) => (i.featured ? `<span class="hot-badge">${ICON.star}<span>招牌</span></span>` : "");
+// 新品（电商版）：加进菜单 7 天内
+const newTag = (i) => (i.is_new ? `<span class="new-badge">新品</span>` : "");
+// 规格一行小字：普通规格写组名（如「大小 · 加料」）；套餐步骤（从菜单选的菜）直接写可选的菜（如「柠檬冰茶 / 橙子冰茶」），
+// 不显示「第 1 步」这种顾客看不懂的名字
+function optionsSummary(i) {
+  if (!hasOptions(i)) return "";
+  return i.options.map((g) => (g.choices || []).some((c) => c.item_id) ? g.choices.map((c) => c.name).join(" / ") : g.name).join(" · ");
+}
+
+function renderList() {
+  const box = $("#menuItems");
+  if (!box) return;
+  if (shopLayout()) return renderShopList(box);
+  const found = searchDishes(S.items, S.q);
+  let html;
+  if (found) {
+    // 搜索：不分组，最相关的在前，按拼音首字母排
+    // 0 道：只说「没有找到菜品」；1 道用单数的句子（外语「1 dish found」）
+    html = found.length
+      ? `<div class="search-hint">${found.length === 1 ? "找到 1 道菜" : `找到 ${found.length} 道菜`}</div>${algUnknownHtml(found)}` + found.map((i) => dishHtml(i, true)).join("")
+      : `<div class="notice">没有找到菜品<div class="muted" style="font-size:13px;margin-top:6px">输入菜名的拼音首字母，如「宫保鸡丁」输入 gbjd</div></div>`;
+  } else {
+    // 所有分类连成一整列，从第一道菜一直滑到底（店主 10-15，像美团）；点左边分类跳到那一段，滑动时左边跟着高亮（catSpy）
+    // 标题只写分类名（不重复图标、不显示数量）；「热销」下面加一行说明
+    const cats = menuCats().filter((c) => catItems(c.id).length);
+    html = cats.length ? algUnknownHtml(S.items) + cats.map((c) => `<section class="cat-sec" data-sec="${c.id}">
+      <div class="cat-title"><h2>${esc(c.name)}</h2>${c.id === HOT ? `<div class="cat-sub">本店招牌和最近卖得最好的菜</div>` : ""}</div>
+      ${catItems(c.id).map((i) => dishHtml(i, false)).join("")}</section>`).join("")
+      : `<div class="notice">暂无可点的菜品</div>`;
+  }
+  // 过敏原说明：列表最下面（「部分菜品未标注」的提醒在分类顶部，按这次真正显示出来的菜算）
+  if (S.allergens) {
+    html += `<div class="alg-foot"><button type="button" class="alg-link" id="algLegend">${ICON.info}<span>过敏原说明</span></button>
+    <div>如有食物过敏，请在下单前告诉我们${S.storePhone ? `（电话 ${esc(S.storePhone)}）` : ""}。</div></div>`;
+  }
+  box.innerHTML = html;
+}
+
+// 欧盟法规（INCO）：这一屏有没标注过敏原的菜，顶部提醒一句（每道菜下面也有一行「过敏原信息请询问店员」）
+function algUnknownHtml(list) {
+  return S.allergens && list.some((i) => i.allergens == null) ? `<div class="alg-unknown">${ICON.alert}<span>${isShop() ? "部分产品未标注过敏原，如有过敏请询问店员" : "部分菜品未标注过敏原，如有过敏请询问店员"}</span></div>` : "";
+}
+// 「1 份」单独一句（外语有单数：1 item / 1 article）
+const countLabel = (n) => (isShop() ? (n === 1 ? "1 件" : `${n} 件`) : n === 1 ? "1 份" : `${n} 份`);
+
+function renderCartBar() {
+  const bar = $("#cartBar");
+  if (!bar) return;
+  const { count, total } = cartTotals();
+  const orderedCount = S.ordered ? S.ordered.items.reduce((s, i) => s + i.qty, 0) : 0;
+  bar.classList.toggle("closed-bar", Boolean(S.closed));
+  if (S.closed) {
+    bar.innerHTML = `<div class="sum" style="font-size:15px;font-weight:600">${ICON.moon}<span>${S.closed.reason === "hours" ? "本店已打烊" : "今日已不接线上外卖"}</span></div>${S.takeaway && savedVouchers().length ? `<button class="ordered" id="myVouchers">我的外带单</button>` : ""}`;
+    $("#myVouchers")?.addEventListener("click", () => showVoucher(savedVouchers()[0].token));
+    return;
+  }
+  // 共享购物车：右上角桌号旁边写「手机 N」（单独一个小标签）；底部是全桌的份数
+  const tno = $(".head .tno");
+  if (tno && customerToken && !S.takeaway) {
+    const want = SC && SC.me != null ? phoneLabel(SC.me) : "";
+    let me = $(".head .tme");
+    if (want && !me) { me = document.createElement("span"); me.className = "tme"; tno.after(me); }
+    if (me && me.dataset.v !== want) { me.dataset.v = want; me.textContent = want; me.hidden = !want; }
+  }
+  bar.innerHTML = `
+    <div class="sum num">${ICON.bag}${count ? `<span>${money(total)}</span>` : `<span class="empty">${isShop() ? "购物车是空的" : "还没有选菜"}</span>`}${count ? `<small>${SC ? `全桌 ${countLabel(count)}` : countLabel(count)}</small>` : ""}</div>
+    ${orderedCount ? `<button class="ordered" id="showOrdered">已点 ${orderedCount}</button>` : ""}
+    ${S.takeaway && !S.kiosk && savedVouchers().length ? `<button class="ordered" id="myVouchers">我的外带单</button>` : ""}
+    <button class="go" id="go" ${count ? "" : "disabled"}>${isShop() ? "去结账" : "选好了"}</button>`;
+  $("#go").onclick = openCart;
+  $("#showOrdered")?.addEventListener("click", openOrdered);
+  $("#myVouchers")?.addEventListener("click", () => showVoucher(savedVouchers()[0].token));
+}
+
+// 点左边分类：滑到这一类的标题（搜索中先清掉搜索，回到整列）
+function showCategory(id) {
+  S.cat = id;
+  if (S.q) { S.q = ""; const input = $("#dishSearch"); if (input) input.value = ""; $("#clearSearch").hidden = true; renderList(); }
+  renderNav();
+  const sec = document.querySelector(`#menuItems [data-sec="${id}"]`);
+  if (!sec) return scrollToList();
+  spyHold = Date.now() + 600; spyPick = id; // 跳过去的这一下不要让 catSpy 改高亮（最后一类很短、滑不到顶时也保持点的那一类）
+  window.scrollTo(0, Math.max(0, sec.getBoundingClientRect().top + window.scrollY - topOffset() + 1));
+}
+// 滑动时左边分类跟着走：标题已经滑到顶部固定区下面的最后一类就是「现在这一类」
+let spyHold = 0, spyRaf = 0, spyPick = null;
+function catSpy() {
+  spyRaf = 0;
+  if (Date.now() < spyHold || S.q.trim() || shopLayout()) return;
+  const secs = document.querySelectorAll("#menuItems [data-sec]");
+  if (!secs.length) return;
+  const top = topOffset() + 8;
+  let cur = secs[0];
+  for (const s of secs) { if (s.getBoundingClientRect().top <= top) cur = s; else break; }
+  // 滑到最底下了（最后几类很短、标题到不了顶）：刚点过的那一类还在屏幕上就保持它，否则亮最后一类
+  if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) {
+    const picked = spyPick != null && document.querySelector(`#menuItems [data-sec="${spyPick}"]`);
+    cur = picked && picked.getBoundingClientRect().top < window.innerHeight ? picked : secs[secs.length - 1];
+  } else spyPick = null;
+  const id = cur.dataset.sec === String(HOT) ? HOT : Number(cur.dataset.sec);
+  if (id === S.cat) return;
+  S.cat = id;
+  const nav = $("#menuNav");
+  if (!nav) return;
+  for (const b of nav.querySelectorAll("button[data-cat]")) b.classList.toggle("on", b.dataset.cat === String(id));
+  const on = nav.querySelector(".on");
+  if (on) {
+    if (on.offsetTop < nav.scrollTop) nav.scrollTop = on.offsetTop;
+    else if (on.offsetTop + on.offsetHeight > nav.scrollTop + nav.clientHeight) nav.scrollTop = on.offsetTop + on.offsetHeight - nav.clientHeight;
+  }
+}
+window.addEventListener("scroll", () => { if (!spyRaf) spyRaf = requestAnimationFrame(catSpy); }, { passive: true });
+
+// 顶部固定区（标题栏 + 搜索框）的高度：分类栏吸在它下面
+function topOffset() {
+  const head = $(".head"), bar = $(".search-bar");
+  return (head?.offsetHeight || 0) + (bar?.offsetHeight || 0);
+}
+
+// 只在数值真的变了才写（写 CSS 变量会触发重新排版；反复写同样的值会让页面一直忙）
+function setVar(name, v) {
+  const root = document.documentElement;
+  if (root.style.getPropertyValue(name) !== v) root.style.setProperty(name, v);
+}
+function layoutMenu() {
+  // 手机浏览器：innerHeight 是现在看得见的高度（地址栏、工具栏不算）；键盘弹出不算（不然分类栏会跟着缩）
+  setVar("--app-h", window.innerHeight + "px");
+  setVar("--menu-top", topOffset() + "px");
+  setVar("--head-h", ($(".head")?.offsetHeight || 0) + "px");
+}
+window.addEventListener("resize", () => { if ($("#menuNav")) layoutMenu(); });
+
+// ---------- 过敏原（欧盟 1169/2011）----------
+// 菜名下面一排小图标；点「过敏原说明」看图标对应的名字；没填过的菜：分类顶部统一提示一句（不再每道菜重复）
+// 菜名下面一行小字：过敏原短名字（文字比表情图标清楚，各种手机显示一样）
+const algShort = (a) => ALG_SHORT[a.code] || a.name;
+function allergenIcons(i) {
+  if (S.allergens && i.allergens == null) return `<div class="alg-row alg-ask"><span class="alg">${ICON.info}<span>过敏原信息请询问店员</span></span></div>`;
+  if (!S.allergens || !i.allergens?.length) return "";
+  const list = i.allergens.map((c) => S.allergens.get(c)).filter(Boolean);
+  return list.length ? `<div class="alg-row">${list.map((a, n) => `<span class="alg" title="${esc(a.name)}">${n ? "" : ICON.alert}${esc(algShort(a))}</span>`).join("")}</div>` : "";
+}
+function allergenNames(i) {
+  if (!S.allergens || !i.allergens?.length) return "";
+  return i.allergens.map((c) => S.allergens.get(c)).filter(Boolean).map((a) => `<span>${esc(algShort(a))}</span>`).join(", ");
+}
+function openAllergenLegend() {
+  sheet("过敏原说明", `<p class="muted" style="margin-top:0">每道菜名字下面的小字表示这道菜含有的过敏原（欧盟规定的 14 类）。</p>
+    <div class="alg-legend">${[...S.allergens.values()].map((a) => `<div><b>${esc(algShort(a))}</b>${ALG_SHORT[a.code] ? `<span class="muted">${esc(a.name)}</span>` : ""}</div>`).join("")}</div>
+    <p style="margin-bottom:0">如有食物过敏或不耐受，请在下单前告诉我们${S.storePhone ? `（电话 ${esc(S.storePhone)}）` : ""}。</p>`);
+}
+
+// 点菜品图片：全屏看大图（可以双指放大），下面直接加入购物车
+function openZoom(item, src) {
+  const mask = document.createElement("div");
+  mask.className = "zoom-mask";
+  mask.innerHTML = `<button type="button" class="zoom-x" aria-label="关闭">×</button>
+    <div class="zoom-img"><img src="${esc(src || item.image)}" alt="${esc(item.name)}"></div>
+    <div class="zoom-info"><div><b>${esc(item.name)}</b>${allergenNames(item) ? `<div class="alg-names">${allergenNames(item)}</div>` : ""}<div class="price num">${money(item.price_cents)}${hasOptions(item) ? '<small> 起</small>' : ""}</div></div>
+      ${item.sold_out ? `<button type="button" class="btn" disabled aria-disabled="true">已售完</button>` : `<button type="button" class="btn primary" data-zadd>${hasOptions(item) ? "选规格" : "＋ 加一份"}</button>`}</div>`;
+  const close = () => { mask.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  document.addEventListener("keydown", onKey);
+  mask.addEventListener("click", (e) => {
+    if (e.target.closest("[data-zadd]")) {
+      close();
+      confirmDup(item, () => {
+        if (hasOptions(item)) openPicker(item);
+        else if (addToCart(item)) { renderMenu(); toast(I18N.t("已加入购物车"), "success"); }
+      });
+      return;
+    }
+    if (e.target.closest(".zoom-x") || e.target === mask || e.target.classList.contains("zoom-img")) close();
+  });
+  document.body.appendChild(mask);
+}
+
+app.addEventListener("click", (e) => {
+  if (e.target.closest("#algLegend")) return openAllergenLegend();
+  const po = e.target.closest("[data-pdopen]");
+  if (po) return openProduct(Number(po.dataset.pdopen));
+  const card = e.target.closest("[data-pd]");
+  if (card && !e.target.closest("button")) return openProduct(Number(card.dataset.pd));
+  const zoom = e.target.closest("[data-zoom]");
+  if (zoom) return openZoom(itemById(Number(zoom.dataset.zoom)));
+  const inc = e.target.closest("[data-inc]"), dec = e.target.closest("[data-dec]");
+  const spec = e.target.closest("[data-spec]"), cat = e.target.closest("[data-cat]");
+  if (inc) { const item = itemById(Number(inc.dataset.inc)); confirmDup(item, () => { if (addToCart(item)) renderMenu(); }); }
+  if (dec) { changeLine(dec.dataset.dec, -1); renderMenu(); }
+  if (spec) {
+    const item = itemById(Number(spec.dataset.spec));
+    if (!item.sold_out) confirmDup(item, () => openPicker(item));
+  }
+  if (cat) showCategory(cat.dataset.cat === HOT ? HOT : Number(cat.dataset.cat));
+});
+
+// ---------- 电商版（v1.38）----------
+const SHOP_ALL = "all";
+function renderShopShell() {
+  if (!S.shopCat) S.shopCat = SHOP_ALL;
+  app.innerHTML = `
+    <div class="head"><h1 id="storeTitle">${esc(S.storeName)}</h1>${S.remote ? `<button type="button" class="tno tno-btn" id="myOrders">我的订单</button>` : `<span class="tno">${S.takeaway ? "外带自提" : esc(S.table.table_no) + " 桌"}</span>`}</div>
+    ${bannerHtml()}
+    ${closedBarHtml()}
+    ${S.takeaway && S.gway?.url ? `<a class="gway-link" href="${esc(S.gway.url)}"><b>${ICON.bag} Gway</b><span>${esc(I18N.t("在 Gway 商城下单：网上付款，还可以外送到家"))}</span><i>${ICON.chevron}</i></a>` : ""}
+    <div class="search-bar shop-bar"><select id="shopCat" aria-label="分区"></select><input type="search" id="dishSearch" value="${esc(S.q)}" placeholder="搜索产品" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"><button id="clearSearch" aria-label="清空" ${S.q ? "" : "hidden"}>×</button></div>
+    <div class="menu shop-wrap"><div class="items shop-grid" id="menuItems"></div></div>
+    <div class="cartbar" id="cartBar"></div>`;
+  layoutMenu();
+  startBanner();
+  const input = $("#dishSearch");
+  input.addEventListener("input", () => setSearch(input.value));
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
+  $("#clearSearch").addEventListener("click", () => { input.value = ""; setSearch(""); });
+  $("#menuItems").addEventListener("change", (e) => {
+    if (e.target.id !== "shopSort") return;
+    S.shopSort = e.target.value;
+    renderList(); scrollToList();
+  });
+  $("#myOrders")?.addEventListener("click", openMyOrders);
+  $("#shopCat").addEventListener("change", (e) => {
+    S.shopCat = e.target.value === SHOP_ALL || e.target.value === HOT ? e.target.value : Number(e.target.value);
+    if (S.q) { S.q = ""; input.value = ""; $("#clearSearch").hidden = true; }
+    renderList(); scrollToList();
+  });
+  renderList();
+  renderCartBar();
+}
+// 下拉框：「全部产品 · N」+ 各分区（后面是件数）
+function renderShopCats() {
+  const sel = $("#shopCat");
+  if (!sel) return;
+  const cats = menuCats();
+  if (S.shopCat !== SHOP_ALL && !cats.some((c) => c.id === S.shopCat)) S.shopCat = SHOP_ALL;
+  const opts = [{ id: SHOP_ALL, name: I18N.t("全部产品"), n: uniqGroups(S.items).length }, ...cats.map((c) => ({ id: c.id, name: c.name, n: uniqGroups(catItems(c.id)).length }))];
+  const sig = opts.map((o) => o.id + ":" + o.name + ":" + o.n).join("|");
+  if (sel.dataset.sig !== sig) {
+    sel.dataset.sig = sig;
+    sel.innerHTML = opts.map((o) => `<option value="${o.id}">${esc(o.name)} · ${o.n}</option>`).join("");
+  }
+  sel.value = String(S.shopCat);
+}
+function shopCardHtml(i) {
+  const n = (i.photos || []).length;
+  const rows = groupRows(i);
+  const soldOut = rows.every((x) => x.sold_out);
+  const prices = rows.map((x) => x.price_cents);
+  const from = isGoods(i) && rows.length > 1 && Math.min(...prices) !== Math.max(...prices);
+  const low = rows.length === 1 && !i.sold_out && i.left != null && i.left > 0 && i.left <= 3 ? `<span class="low-badge">${i.weighed ? `只剩 ${i.left} kg` : `只剩 ${i.left} 件`}</span>` : "";
+  return `<div class="pcard ${soldOut ? "sold-out" : ""}" data-pd="${i.id}">
+    <div class="pc-img">${i.image ? `<img src="${esc(i.thumb || i.image)}" alt="" loading="lazy" decoding="async">` : `<div class="ph">${esc(i.name.slice(0, 1))}</div>`}${i.featured || i.is_new ? `<div class="pc-tags">${newTag(i)}${featuredTag(i)}</div>` : ""}${n > 1 ? `<span class="pc-n">1 / ${n}</span>` : ""}</div>
+    <div class="pc-body"><div class="pc-name">${esc(i.name)}</div>${low}
+      <div class="pc-foot"><div class="price num">${isGoods(i) ? (from ? `${money(Math.min(...prices))}<small> 起</small>` : goodsPrice(i)) : priceHtml(i)}${hasOptions(i) ? "<small> 起</small>" : ""}</div><div class="stepper">${dishControl(i)}</div></div></div></div>`;
+}
+// 排序：推荐（招牌在前，其余按菜单顺序）/ 新品在前 / 价格从低到高 / 从高到低
+const SHOP_SORTS = [["rec", "推荐"], ["new", "新品在前"], ["asc", "价格从低到高"], ["desc", "价格从高到低"]];
+function shopSorted(list) {
+  const k = S.shopSort || "rec";
+  const at = new Map(S.items.map((i, n) => [i.id, n]));
+  const base = (a, b) => at.get(a.id) - at.get(b.id);
+  const by = { rec: (a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || base(a, b), new: (a, b) => (b.is_new ? 1 : 0) - (a.is_new ? 1 : 0) || b.id - a.id,
+    asc: (a, b) => a.price_cents - b.price_cents || base(a, b), desc: (a, b) => b.price_cents - a.price_cents || base(a, b) }[k];
+  return [...list].sort(by);
+}
+function shopTools(n) {
+  return `<div class="shop-tools"><span class="muted">${n === 1 ? "1 件产品" : `${n} 件产品`}</span><label class="shop-sort"><span class="muted">排序</span><select id="shopSort" aria-label="排序">${SHOP_SORTS.map(([k, t]) => `<option value="${k}" ${(S.shopSort || "rec") === k ? "selected" : ""}>${t}</option>`).join("")}</select></label></div>`;
+}
+function renderShopList(box) {
+  renderShopCats();
+  const found = searchDishes(S.items, S.q);
+  let html;
+  if (found) {
+    const fu = uniqGroups(found);
+    html = fu.length ? `<div class="search-hint">${fu.length === 1 ? "找到 1 件产品" : `找到 ${fu.length} 件产品`}</div>${algUnknownHtml(fu)}${fu.map(shopCardHtml).join("")}`
+      : `<div class="notice">没有找到产品</div>`;
+  } else if (S.shopCat === SHOP_ALL && (S.shopSort || "rec") === "rec") {
+    // 全部产品、推荐排序：按分区排，每个分区一个小标题
+    html = shopTools(uniqGroups(S.items).length) + algUnknownHtml(S.items) + S.categories.map((c) => { const list = uniqGroups(shopSorted(catItems(c.id))); return list.length ? `<div class="cat-title"><h2>${esc(c.name)}</h2></div>${list.map(shopCardHtml).join("")}` : ""; }).join("")
+      || `<div class="notice">暂无产品</div>`;
+  } else {
+    // 一个分区，或者全部产品按新品 / 价格排（不分小标题）
+    const list = uniqGroups(shopSorted(S.shopCat === SHOP_ALL ? S.items : catItems(S.shopCat)));
+    html = list.length ? shopTools(list.length) + algUnknownHtml(list) + list.map(shopCardHtml).join("") : `<div class="notice">暂无产品</div>`;
+  }
+  if (S.allergens) html += `<div class="alg-foot"><button type="button" class="alg-link" id="algLegend">${ICON.info}<span>过敏原说明</span></button>
+    <div>如有食物过敏，请在下单前告诉我们${S.storePhone ? `（电话 ${esc(S.storePhone)}）` : ""}。</div></div>`;
+  box.innerHTML = html;
+}
+
+// 我的订单：这台手机下过的单（点开看订单页）+ 按电话查（换了手机、清了浏览器也能查状态和快递单号）
+const LOOKUP_ST = { unpaid: "待付款", paid: "准备中", cancelled: "已作废", refunded: "已退款" };
+function lookupRow(o) {
+  const st = o.status === "picked_up" ? (o.delivery ? (o.delivery.mode === "ship" ? "已寄出" : "已送出") : "已取餐") : LOOKUP_ST[o.status] || o.status;
+  const d = o.delivery;
+  const track = d && d.tracking ? (d.track_url ? `<a href="${esc(d.track_url)}" target="_blank" rel="noopener" translate="no">${esc(d.tracking)}</a>` : `<b translate="no">${esc(d.tracking)}</b>`) : "";
+  return `<div class="lk-row"><div class="lk-top"><b class="num">${esc(o.pickup_label)}</b><span class="lk-st">${st}</span><span class="num">${money(o.total_cents)}</span></div>
+    <div class="muted lk-sub">${esc(String(o.created_at).slice(5, 16))} · ${countLabel(o.items)}${d ? ` · ${d.mode === "ship" ? "📦 快递邮寄" : `🛵 送货上门 · ${esc(d.zone || "")}`}` : " · 🏪 到店自取"}</div>
+    ${track ? `<div class="lk-track">快递单号：${track}</div>` : ""}</div>`;
+}
+function openMyOrders() {
+  const mine = savedVouchers();
+  let phone = "";
+  try { phone = JSON.parse(localStorage.getItem("pos_contact") || "{}").phone || ""; } catch {}
+  const m = sheet("我的订单", `${mine.length ? `<div class="lk-mine"><div class="rf-title">这台手机下的单</div>${mine.map((x) => `<button type="button" class="btn small" data-v="${esc(x.token)}">${esc(x.label)}</button>`).join("")}</div>` : ""}
+    <div class="rf-title" style="margin-top:12px">按电话查</div>
+    <div class="lk-form"><input type="tel" id="lkPhone" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="下单时留的电话" value="${esc(phone)}"><button type="button" class="btn primary" id="lkGo">查询</button></div>
+    <div id="lkOut" class="lk-out"><p class="muted" style="font-size:13px">可以查最近 60 天的网上订单：状态、金额和快递单号。</p></div>`);
+  m.addEventListener("click", async (e) => {
+    const v = e.target.closest("[data-v]");
+    if (v) { m.remove(); return showVoucher(v.dataset.v); }
+    if (!e.target.closest("#lkGo")) return;
+    const out = $("#lkOut", m), btn = e.target.closest("#lkGo");
+    btn.disabled = true;
+    try {
+      const list = await api("/api/public/order-lookup", { method: "POST", auth: false, body: { phone: $("#lkPhone", m).value } });
+      out.innerHTML = list.length ? list.map(lookupRow).join("") : `<p class="muted">这个电话最近 60 天没有网上订单</p>`;
+    } catch (err) { out.innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
+    btn.disabled = false;
+  });
+  m.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "lkPhone") $("#lkGo", m).click(); });
+}
+
+// 产品详情页：多张图左右滑（下面一排小图）、价格、规格、过敏原、介绍、参数；底部「加入购物车」。
+// 打开时地址加 #p=编号（手机返回键回到列表；链接可以单独发给顾客）
+let pdItem = null;
+// 商品的选择区：多规格按「颜色 / 尺码」一排排选（卖完的组合划掉），称重的选重量
+function goodsPicker(item) {
+  const rows = groupRows(item);
+  let html = "";
+  if (rows.length > 1) {
+    const split = (r) => String(r.variant || "").split(" / ");
+    const cur = split(item);
+    const nd = Math.max(...rows.map((r) => split(r).length));
+    const label = (k) => (nd === 2 ? (k === 0 ? "颜色" : "尺码") : "规格");
+    // 按录入的顺序排（多规格窗口里填的「红, 白」「S, M, L」），不按字母
+    const byId = rows.slice().sort((a, b) => a.id - b.id);
+    for (let k = 0; k < nd; k++) {
+      const vals = [...new Set(byId.map((r) => split(r)[k]).filter(Boolean))];
+      html += `<div class="gv-row"><span class="gv-l">${label(k)}</span>${vals.map((v) => {
+        const want = cur.slice(); want[k] = v;
+        const exact = rows.find((r) => split(r).join("|") === want.join("|"));
+        // 点了去哪个规格：正好这个组合有货就去它；没货就去这个颜色 / 尺码里有货的；都没货才划掉
+        const t = v === cur[k] ? item : exact && !exact.sold_out ? exact : byId.find((r) => split(r)[k] === v && !r.sold_out) || exact || byId.find((r) => split(r)[k] === v);
+        const off = !t || t.sold_out;
+        return `<button type="button" class="gv ${v === cur[k] ? "on" : ""} ${off ? "off" : ""}" data-gv="${t ? t.id : ""}" ${t ? "" : "disabled"} translate="no">${esc(v)}</button>`;
+      }).join("")}</div>`;
+    }
+  }
+  if (item.weighed) {
+    const w = S.pdWeight;
+    html += `<div class="gv-row"><span class="gv-l">重量</span>${WEIGHTS.map((x) => `<button type="button" class="gv ${x === w ? "on" : ""}" data-gw="${x}">${fmtKg(x)}</button>`).join("")}
+      <span class="gw-step"><button type="button" data-gws="-1" aria-label="减少">${ICON.minus}</button><b class="num">${fmtKg(w)}</b><button type="button" data-gws="1" aria-label="增加">${ICON.plus}</button></span></div>
+      <div class="gw-price num">${fmtKg(w)} = <b>${money(Math.round(item.price_cents * w))}</b></div>`;
+  }
+  return html ? `<div class="gv-box">${html}</div>` : "";
+}
+function openProduct(id, { push = true, replace = false } = {}) {
+  const item = itemById(id);
+  if (!item) return;
+  const keep = replace ? $("#pdPage")?.scrollTop || 0 : 0;
+  // 换了一款商品：重量回到 500 g
+  if (!pdItem || pdItem.group !== item.group || !item.group) S.pdWeight = 0.5;
+  closeProduct({ fromHistory: true });
+  pdItem = item;
+  if (push) history.pushState({ pd: id }, "", location.pathname + location.search + "#p=" + id);
+  else if (replace) history.replaceState(history.state && history.state.pd ? { pd: id } : history.state, "", location.pathname + location.search + "#p=" + id);
+  const photos = (item.photos && item.photos.length ? item.photos : item.image ? [{ src: item.image, thumb: item.thumb }] : []);
+  const pg = document.createElement("div");
+  pg.className = "pd-page";
+  pg.id = "pdPage";
+  pg.setAttribute("role", "dialog");
+  pg.setAttribute("aria-label", item.name);
+  pg.innerHTML = `<div class="pd-top"><button type="button" class="pd-back" aria-label="返回">‹</button><span class="pd-title">${esc(item.name)}</span><button type="button" class="pd-share" id="pdShare">${ICON.share}<span>分享</span></button></div>
+    <div class="pd-main">
+      <div class="pd-gallery"><div class="pd-media"><div class="pd-track" id="pdTrack">${photos.length ? photos.map((p, n) => `<img src="${esc(p.src)}" alt="" data-pz="${n}" ${n ? 'loading="lazy"' : ""} decoding="async" draggable="false">`).join("") : `<div class="ph">${esc(item.name.slice(0, 1))}</div>`}</div>
+        ${photos.length > 1 ? `<div class="pd-dots">${photos.map((_, n) => `<span class="${n ? "" : "on"}"></span>`).join("")}</div>` : ""}</div>
+      ${photos.length > 1 ? `<div class="pd-thumbs">${photos.map((p, n) => `<button type="button" class="${n ? "" : "on"}" data-pt="${n}" aria-label="第 ${n + 1} 张"><img src="${esc(p.thumb || p.src)}" alt="" loading="lazy"></button>`).join("")}</div>` : ""}</div>
+      <div class="pd-info">
+        ${item.featured || item.is_new ? `<div class="pd-tags">${newTag(item)}${featuredTag(item)}</div>` : ""}
+        <h1>${esc(item.name)}</h1>
+        <div class="pd-price num">${isGoods(item) ? goodsPrice(item) : priceHtml(item)}${hasOptions(item) ? "<small> 起</small>" : ""}${item.sold_out ? `<span class="so-tag">已售完</span>` : !item.sold_out && item.left != null && item.left > 0 && item.left <= 3 ? `<span class="low-badge">只剩 ${item.left} 件</span>` : ""}</div>
+        ${optionsSummary(item) ? `<div class="pd-opts">${esc(optionsSummary(item))}</div>` : ""}
+        ${isGoods(item) ? goodsPicker(item) : ""}
+        ${item.ship_fee_cents && S.delivery?.ship ? `<div class="pd-opts">📦 ${esc(I18N.t("快递邮寄每件另加邮费 {0}").replace("{0}", money(item.ship_fee_cents)))}</div>` : ""}
+        ${allergenIcons(item)}
+        ${item.description ? `<div class="pd-sec"><h2>产品介绍</h2><div class="pd-desc" translate="no">${esc(item.description)}</div></div>` : ""}
+        ${(item.specs || []).length ? `<div class="pd-sec"><h2>产品参数</h2><table class="pd-specs" translate="no">${item.specs.map((r) => `<tr><th>${esc(r.k)}</th><td>${esc(r.v)}</td></tr>`).join("")}</table></div>` : ""}
+        ${(item.details || []).length ? `<div class="pd-sec"><h2>产品详情</h2><div class="pd-details">${item.details.map((src) => `<img src="${esc(src)}" alt="" loading="lazy" decoding="async">`).join("")}</div></div>` : ""}
+      </div>
+    </div>
+    <div class="pd-bar" id="pdBar"></div>`;
+  document.body.appendChild(pg);
+  document.body.style.overflow = "hidden";
+  if (keep) pg.scrollTop = keep;
+  renderPdBar();
+  const track = $("#pdTrack", pg);
+  const idx = () => Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+  track.addEventListener("scroll", () => requestAnimationFrame(() => {
+    const k = idx();
+    pg.querySelectorAll(".pd-dots span").forEach((d, n) => d.classList.toggle("on", n === k));
+    pg.querySelectorAll("[data-pt]").forEach((b, n) => b.classList.toggle("on", n === k));
+  }), { passive: true });
+  pg.addEventListener("click", (e) => {
+    if (e.target.closest(".pd-back")) return closeProduct();
+    if (e.target.closest("#pdShare")) return shareProduct(item);
+    const t = e.target.closest("[data-pt]");
+    if (t) return track.scrollTo({ left: Number(t.dataset.pt) * track.clientWidth, behavior: "smooth" });
+    const z = e.target.closest("[data-pz]");
+    if (z) return openZoom(item, photos[Number(z.dataset.pz)].src);
+    if (e.target.closest("#pdCart")) { if (cartTotals().count) { closeProduct(); openCart(); } return; }
+    // 商品：换颜色尺码（换成那个规格，照片、价格、库存跟着变）、选重量
+    const gv = e.target.closest("[data-gv]");
+    if (gv && gv.dataset.gv) return openProduct(Number(gv.dataset.gv), { push: false, replace: true });
+    const gw = e.target.closest("[data-gw]"), gws = e.target.closest("[data-gws]");
+    if (gw || gws) {
+      S.pdWeight = gw ? Number(gw.dataset.gw) : Math.min(20, Math.max(0.25, Math.round((S.pdWeight + 0.25 * Number(gws.dataset.gws)) * 100) / 100));
+      return openProduct(item.id, { push: false, replace: true });
+    }
+    if (e.target.closest("[data-pdadd]")) {
+      if (item.sold_out) return;
+      if (hasOptions(item)) return openPicker(item);
+      if (addToCart(item, [], 1, "", item.weighed ? S.pdWeight : null)) { renderMenu(); toast(I18N.t("已加入购物车"), "success"); }
+      return;
+    }
+    const inc = e.target.closest("[data-inc]"), dec = e.target.closest("[data-dec]"), spec = e.target.closest("[data-spec]");
+    if (inc && addToCart(item)) renderMenu();
+    if (dec) { changeLine(dec.dataset.dec, -1); renderMenu(); }
+    if (spec && !item.sold_out) openPicker(item);
+  });
+  pg.tabIndex = -1;
+  pg.focus({ preventScroll: true }); // 焦点放在详情页上（读屏、键盘能用），不放在「‹」上——手机上会显示一圈粗框
+}
+// 底部：购物车（件数 · 金额）+ 加入购物车（已经加了的显示「− N +」）
+function renderPdBar() {
+  const bar = $("#pdBar");
+  if (!bar || !pdItem) return;
+  const item = itemById(pdItem.id) || pdItem;
+  const { count, total } = cartTotals();
+  const q = itemQty(item.id);
+  const cart = `<button type="button" class="pd-cart" id="pdCart" aria-label="购物车">${ICON.bag}${count ? `<span class="num">${money(total)}</span><span class="n">${count}</span>` : ""}</button>`;
+  bar.innerHTML = item.sold_out || S.closed ? `${cart}<button type="button" class="btn pd-add" disabled>${S.closed ? "今日已不接线上外卖" : "已售完"}</button>`
+    : item.weighed ? `${cart}<button type="button" class="btn primary pd-add" data-pdadd>${q ? `再加 ${fmtKg(S.pdWeight)} · 已加 ${q}` : `加入购物车 · ${money(Math.round(item.price_cents * S.pdWeight))}`}</button>`
+    : q && !hasOptions(item) ? `${cart}<div class="pd-in"><span>已加入购物车</span><div class="stepper">${plainControl(item)}</div></div>`
+    : `${cart}<button type="button" class="btn primary pd-add" data-pdadd>${hasOptions(item) ? (q ? `选规格 · 已加 ${q}` : "选规格") : "加入购物车"}</button>`;
+}
+// 分享：手机上弹出系统分享（WhatsApp、Facebook…），电脑上复制链接；链接里的 ?p= 让服务器给出产品预览卡片
+async function shareProduct(item) {
+  const url = `${location.origin}${location.pathname}?t=${encodeURIComponent(customerToken)}&p=${item.id}`;
+  const title = `${item.name} · ${S.storeName}`;
+  if (navigator.share) {
+    try { await navigator.share({ title, url }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  try { await navigator.clipboard.writeText(url); toast(I18N.t("链接已复制，可以粘贴发给朋友"), "success"); return; } catch {}
+  const m = sheet("分享", `<p class="muted" style="margin:12px 0 6px">长按复制这个链接：</p><input type="text" readonly class="note-input" value="${esc(url)}" translate="no" style="margin-bottom:16px">`);
+  const inp = m.querySelector("input"); inp.focus(); inp.select();
+}
+function closeProduct({ fromHistory = false } = {}) {
+  const pg = $("#pdPage");
+  if (!pg) return;
+  pg.remove();
+  pdItem = null;
+  document.body.style.overflow = "";
+  // 用页面上的「‹」关：地址里的 #p= 也去掉（和按手机返回键一样）
+  if (!fromHistory && /^#p=/.test(location.hash)) { if (history.state && history.state.pd) history.back(); else history.replaceState(null, "", location.pathname + location.search); }
+}
+window.addEventListener("popstate", () => {
+  const m = location.hash.match(/^#p=(\d+)$/);
+  if (!m) return closeProduct({ fromHistory: true });
+  if (shopLayout() && (!pdItem || pdItem.id !== Number(m[1]))) openProduct(Number(m[1]), { push: false });
+});
+
+// v1.25.2：扫桌贴码的顾客加菜时，这桌这张单已经点过这道菜（别的手机、服务员点的都算）：先问一句「还要再加吗？」
+// 只提醒、不拦；同一道菜在这张单里每台手机只问一次；自己购物车里已经有这道菜（连点「+」）不问
+const dupAsked = new Set();
+const orderedQty = (id) => (S.ordered ? S.ordered.items.filter((i) => i.menu_item_id === id).reduce((s, i) => s + i.qty, 0) : 0);
+// v1.26：共享购物车里别的手机已经加了的也算（「这桌已经有 N 份「X」了」）
+function confirmDup(item, go) {
+  if (!item || !customerToken || S.takeaway || S.kiosk) return go();
+  const inDraft = othersQty(item.id);
+  const n = orderedQty(item.id) + inDraft;
+  const key = (SC ? SC.epoch : "") + ":" + (S.ordered?.id || 0) + ":" + item.id;
+  if (!n || itemQty(item.id) > 0 || dupAsked.has(key)) return go();
+  dupAsked.add(key);
+  const m = sheet(inDraft ? "这桌已经有这道菜了" : "这道菜已经点过了",
+    `<p class="dup-msg">${inDraft ? `这桌已经有 ${n} 份「${esc(item.name)}」了，还要再加吗？` : `已经点过 ${n} 份「${esc(item.name)}」，还要再加吗？`}</p>`,
+    `<button type="button" class="btn" data-dup="no">不用了</button><button type="button" class="btn primary" data-dup="yes">加一份</button>`);
+  m.classList.add("dup-sheet");
+  m.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-dup]");
+    if (!b) return;
+    m.remove();
+    if (b.dataset.dup === "yes") go();
+  });
+}
+
+// 选规格弹层：数量最多到还剩的份数（套餐里选的菜也算）
+function openPicker(item) {
+  openOptionPicker(item, (options, qty) => { if (addToCart(item, options, qty)) renderMenu(); }, { maxQty: (options) => maxAdd(item, options).max });
+}
+
+// 底部弹层：打开时焦点移进弹层（读屏、键盘能用），Esc 或点 × / 空白处关闭，关闭后焦点回到原来的按钮
+function sheet(title, bodyHtml, footHtml) {
+  const mask = document.createElement("div");
+  mask.className = "sheet-mask";
+  const back = document.activeElement;
+  mask.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1"><div class="sh"><b id="sheetTitle">${title}</b><button type="button" class="icon-btn" data-close aria-label="关闭">×</button></div><div class="sb">${bodyHtml}</div>${footHtml ? `<div class="sf">${footHtml}</div>` : ""}</div>`;
+  const onKey = (e) => { if (e.key === "Escape" && !e.isComposing && document.body.lastElementChild === mask) { e.preventDefault(); mask.remove(); } };
+  // 各处直接调用 mask.remove() 关弹层：统一在这里收尾
+  mask.remove = function () {
+    document.removeEventListener("keydown", onKey);
+    Element.prototype.remove.call(this);
+    if (back && back !== document.body && back.isConnected && typeof back.focus === "function") back.focus({ preventScroll: true });
+    else document.getElementById("go")?.focus({ preventScroll: true });
+  };
+  mask.addEventListener("click", (e) => { if (e.target === mask || e.target.closest("[data-close]")) mask.remove(); });
+  document.addEventListener("keydown", onKey);
+  document.body.appendChild(mask);
+  $(".sheet", mask).focus({ preventScroll: true });
+  return mask;
+}
+
+// 坐着吃的桌：这一批「上桌」（默认）还是「打包带走」（吃完再点打包，店主 10-10）；下单后回到上桌
+// 只给顾客扫桌贴码用（服务员手机点菜走 /api/orders，不带打包）；共享购物车里说明是这次下单的全部菜
+// 店里扫外带码、开了网上付款（第三批）：选「手机付款」或「到前台付」，默认到前台付
+const instorePay = () => S.takeaway && !S.remote && !S.kiosk && Boolean(S.onlinePay);
+// 平板点餐机设了刷卡机：选「刷卡」或「现金」，默认刷卡
+const kioskCard = () => Boolean(S.kiosk?.card);
+const kioskPick = () => (S.payPick === "store" ? "store" : "card");
+const payPick = () => instorePay() ? `<div class="rf-title">付款方式</div><div class="dine-pick pay-pick"><button type="button" data-paypick="store" class="${S.payPick === "online" ? "" : "on"}">🏪 到前台付</button><button type="button" data-paypick="online" class="${S.payPick === "online" ? "on" : ""}">💳 手机付款</button></div>`
+  : kioskCard() ? `<div class="rf-title">付款方式</div><div class="dine-pick pay-pick"><button type="button" data-paypick="card" class="${kioskPick() === "card" ? "on" : ""}">💳 刷卡</button><button type="button" data-paypick="store" class="${kioskPick() === "store" ? "on" : ""}">💶 现金（到前台付）</button></div>` : "";
+const submitLabel = () => (S.kiosk ? (kioskCard() && kioskPick() === "card" ? "下单并刷卡" : "下单，打印小票") : S.takeaway ? (S.remote ? (isShop() ? "提交订单" : "提交预订") : instorePay() && S.payPick === "online" ? "提交并付款" : "提交，到前台付款") : "确认下单");
+const packPick = (shared = false) => S.takeaway || !customerToken ? "" : `${shared ? `<div class="muted pack-hint">选「打包带走」：这次下单的全部菜都打包</div>` : ""}<div class="dine-pick pack-pick"><button type="button" data-pack="0" class="${S.pack ? "" : "on"}">🍽 上桌</button><button type="button" data-pack="1" class="${S.pack ? "on" : ""}">🥡 打包带走</button></div>`;
+const onPackClick = (e, root) => {
+  const b = e.target.closest("[data-pack]");
+  if (!b) return false;
+  S.pack = b.dataset.pack === "1";
+  root.querySelectorAll("[data-pack]").forEach((x) => x.classList.toggle("on", x === b));
+  return true;
+};
+
+function openCart() {
+  if (SC) return openSharedCart(); // v1.26：同桌共享购物车
+  const rid = requestId(); // 网络不好重复点「下单」时，服务器只会下一次单
+  let stockMsg = null; // 提交时限量的菜被别人买走了：{ name, left }，购物车已经改好，顾客确认后再提交
+  // 弹层开着时实时同步改了购物车：弹层里显示同样的提示（返回 true = 已经提示过了）
+  S.onCartTrim = (t) => {
+    if (!m.isConnected) return false;
+    if (!S.cart.size) { m.remove(); return false; }
+    stockMsg = t;
+    const [b, f] = render();
+    $(".sb", m).innerHTML = b; $(".sf", m).innerHTML = f;
+    $(".sb", m).scrollTop = 0;
+    return true;
+  };
+  const render = () => {
+    const { count, total: goods } = cartTotals();
+    const dq = S.takeaway && S.remote ? dvQuote(goods) : { fee: 0 };
+    const total = goods + dq.fee;
+    return [
+      (stockMsg ? `<div class="stock-msg" role="alert">${ICON.alert}<span><b>${stockMsg.left > 0 ? `「${esc(stockMsg.name)}」只剩 ${stockMsg.left} 份` : `「${esc(stockMsg.name)}」已经卖完了`}</b>${stockMsg.left > 0 ? "已帮您改好购物车，请确认后再提交" : "已从购物车里去掉，请确认后再提交"}</span></div>` : "") +
+      [...S.cart].map(([key, l]) => {
+        const i = itemById(l.id);
+        const text = l.weight ? fmtKg(l.weight) : optionsText(i, l.options);
+        return `<div class="row"><span class="n">${esc(lineName(i))}${text ? `<div class="item-opts">${esc(text)}</div>` : ""}
+            <button type="button" class="note-btn ${l.note ? "has" : ""}" data-lnote="${esc(key)}">${l.note ? "※ " + esc(l.note) : isShop() ? "+ 备注" : "+ 口味备注"}</button></span>
+          <span class="num muted">${money(linePrice(i, l) * l.qty)}</span>
+          <span class="stepper"><button type="button" class="minus" data-line="${esc(key)}" data-d="-1" aria-label="减少">${ICON.minus}</button><span class="q">${l.qty}</span><button type="button" class="plus ${maxAdd(i, l.options, null, l.weight).max < 1 ? "capped" : ""}" data-line="${esc(key)}" data-d="1" aria-label="加一份">${ICON.plus}</button></span></div>`;
+      }).join("") + (S.takeaway && S.remote ? remoteFields() + dvSummary(dq) : "")
+        + allergenCartNote()
+        + packPick()
+        + (S.dineChoice ? `<div class="dine-pick"><button type="button" data-dine="here" class="${S.dine === "here" ? "on" : ""}">🍽 在这里吃</button><button type="button" data-dine="togo" class="${S.dine === "togo" ? "on" : ""}">🥡 打包带走</button></div>` : "")
+        + payPick()
+        + `<label class="order-note-field"><span>整单备注（可选）</span><textarea id="orderNote" maxlength="50" rows="2" placeholder="${isShop() ? "如：送货前先打电话" : "如：尽快上菜、老人用餐做软一点"}">${esc(S.orderNote)}</textarea></label>`,
+      `<div class="sum num" style="flex:1;font-size:18px;font-weight:700">${money(total)} <small class="muted" style="font-size:12px;font-weight:400">${countLabel(count)}</small></div>
+       <button class="btn primary big" id="submit" ${count && !dq.short ? "" : "disabled"}>${submitLabel()}</button>`,
+    ];
+  };
+  const [body, foot] = render();
+  const m = sheet(isShop() ? "购物车" : S.takeaway ? "外带 · 确认菜品" : `${esc(S.table.table_no)} 桌 · 确认菜品`, body, foot);
+  const redraw = () => { const top = $(".sb", m).scrollTop; const [b, f] = render(); $(".sb", m).innerHTML = b; $(".sf", m).innerHTML = f; $(".sb", m).scrollTop = top; };
+  m.addEventListener("input", (e) => {
+    if (e.target.id === "orderNote") S.orderNote = e.target.value;
+    if (e.target.dataset.contact) S.contact[e.target.dataset.contact] = e.target.value;
+    if (e.target.dataset.dv) S.dv[e.target.dataset.dv] = e.target.value;
+  });
+  m.addEventListener("change", (e) => {
+    // 换送货区域：运费、起送价跟着变
+    if (e.target.dataset.dv) { S.dv[e.target.dataset.dv] = e.target.value; saveDv(); if (e.target.dataset.dv === "zone") redraw(); return; }
+    if (!e.target.dataset.contact) return;
+    S.contact[e.target.dataset.contact] = e.target.value;
+    // 选「其他」才显示取餐时间备注
+    if (e.target.dataset.contact === "pickup_time") {
+      const row = m.querySelector("[data-pickup-note]");
+      if (row) { row.hidden = e.target.value !== "note"; if (!row.hidden) row.querySelector("input").focus(); }
+    }
+  });
+  m.addEventListener("click", async (e) => {
+    if (onPackClick(e, m)) return;
+    // 配送方式：到店自取 / 送货上门 / 快递邮寄
+    const dm = e.target.closest("[data-dvmode]");
+    if (dm) { S.dv.mode = dm.dataset.dvmode; saveDv(); redraw(); return; }
+    // 送货上门：用手机定位（送货员扫小票上的二维码直接导航到这里）
+    if (e.target.closest("[data-geo]")) {
+      if (!navigator.geolocation) { toast(I18N.t("这台手机不能定位，请写清楚地址"), "error"); return; }
+      const b = e.target.closest("[data-geo]");
+      b.disabled = true; b.textContent = I18N.t("正在定位…");
+      navigator.geolocation.getCurrentPosition(
+        (p) => { S.dv.lat = p.coords.latitude; S.dv.lng = p.coords.longitude; saveDv(); redraw(); toast(I18N.t("已记下您的位置"), "success"); },
+        () => { b.disabled = false; b.textContent = I18N.t("📍 用我现在的位置"); toast(I18N.t("没有拿到位置，请写清楚地址"), "error"); },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+      return;
+    }
+    if (e.target.closest("[data-geoclear]")) { delete S.dv.lat; delete S.dv.lng; saveDv(); redraw(); return; }
+    const dn = e.target.closest("[data-dine]");
+    if (dn) {
+      S.dine = dn.dataset.dine;
+      m.querySelectorAll("[data-dine]").forEach((b) => b.classList.toggle("on", b === dn));
+      return;
+    }
+    const pp = e.target.closest("[data-paypick]");
+    if (pp) {
+      S.payPick = pp.dataset.paypick;
+      m.querySelectorAll("[data-paypick]").forEach((b) => b.classList.toggle("on", b === pp));
+      const sb = m.querySelector("#submit");
+      if (sb) sb.textContent = I18N.t(submitLabel());
+      return;
+    }
+    const ln = e.target.closest("[data-lnote]");
+    if (ln) {
+      const old = S.cart.get(ln.dataset.lnote);
+      const item = itemById(old.id);
+      return openNoteSheet(`「${item.name}」口味备注`, old.note, (note) => {
+        // 改备注后这一行留在原来的位置（以前会跑到购物车最后）
+        const order = [...S.cart.keys()], at = order.indexOf(ln.dataset.lnote);
+        S.cart.delete(ln.dataset.lnote);
+        addToCart(item, old.options, old.qty, note);
+        const nk = cartKey(item.id, old.options) + "#" + note;
+        if (at >= 0 && !order.includes(nk)) { const entries = [...S.cart]; const moved = entries.pop(); entries.splice(at, 0, moved); S.cart = new Map(entries); }
+        const [b, f] = render();
+        $(".sb", m).innerHTML = b; $(".sf", m).innerHTML = f;
+      });
+    }
+    const line = e.target.closest("[data-line]");
+    if (line) {
+      changeLine(line.dataset.line, Number(line.dataset.d));
+      const [b, f] = render();
+      $(".sb", m).innerHTML = b; $(".sf", m).innerHTML = f;
+      renderMenu();
+      if (!S.cart.size) m.remove();
+      return;
+    }
+    const submit = e.target.closest("#submit");
+    if (!submit) return;
+    if (S.dineChoice && !S.dine) { toast(I18N.t("请选择在这里吃还是打包带走"), "error"); return; }
+    stockMsg = null;
+    submit.disabled = true;
+    submit.textContent = "下单中…";
+    const items = [...S.cart.values()].map((l) => ({ menu_item_id: l.id, qty: l.qty, options: l.options, note: l.note || undefined, weight: l.weight || undefined }));
+    const note = S.orderNote.trim() || undefined;
+    try {
+      let result;
+      if (customerToken) {
+        const contact = S.takeaway && S.remote ? { ...S.contact } : undefined;
+        if (contact) {
+          const needName = S.remoteNeed?.name !== false, needPhone = S.remoteNeed?.phone !== false;
+          if ((needName && !contact.name.trim()) || (needPhone && !contact.phone.trim())) {
+            toast(I18N.t(needName && needPhone ? "请填写姓名和电话" : needName ? "请填写姓名" : "请填写电话"), "error"); submit.disabled = false; submit.textContent = I18N.t("提交预订"); return;
+          }
+          if (contact.pickup_time === "note" && !String(contact.pickup_note || "").trim()) { toast(I18N.t("请写上取餐时间备注"), "error"); submit.disabled = false; submit.textContent = I18N.t("提交预订"); return; }
+          const dvErr = dvCheck(contact);
+          if (dvErr) { toast(I18N.t(dvErr), "error"); submit.disabled = false; submit.textContent = I18N.t(submitLabel()); return; }
+          try { localStorage.setItem("pos_contact", JSON.stringify({ name: contact.name, phone: contact.phone })); } catch {}
+        }
+        // 网上预订：确认看过过敏原（欧盟规定付款前要能看到），放在姓名电话检查之后
+        if (contact && S.allergens && !m.querySelector("#algOk")?.checked) {
+          toast(I18N.t("请先查看过敏原信息并勾选确认"), "error");
+          m.querySelector("#algOk")?.scrollIntoView({ block: "center" });
+          submit.disabled = false; submit.textContent = I18N.t("提交预订"); return;
+        }
+        const delivery = contact && S.delivery && S.dv.mode !== "pickup" ? dvPayload() : undefined;
+        if (delivery?.mode === "ship") contact.pickup_time = "asap"; // 邮寄没有取餐时间
+        const payMode = delivery ? (S.onlinePay ? "online" : "store") : contact && S.onlinePay ? (S.onlinePay.mode === "required" || contact.pay !== "store" ? "online" : "store") : instorePay() && S.payPick === "online" ? "online" : kioskCard() && kioskPick() === "card" ? "card" : undefined;
+        if (contact) delete contact.pay;
+        result = await api(`/api/public/tables/${encodeURIComponent(customerToken)}/orders`, { method: "POST", auth: false, body: { items, note, request_id: rid, contact, delivery, pay_mode: payMode, device: S.takeaway && !S.kiosk ? DEVICE : undefined, dine_option: S.dineChoice ? S.dine : undefined, guests: S.takeaway ? undefined : S.guests || undefined, pack: S.takeaway ? undefined : Boolean(S.pack) } });
+      } else {
+        await api("/api/orders", { method: "POST", body: { table_id: S.table.id, items, note, request_id: rid, guests: S.guests || undefined } });
+      }
+      S.cart.clear();
+      S.orderNote = "";
+      m.remove();
+      if (S.kiosk) return kioskCard() && kioskPick() === "card" ? kioskPay(result.access_token, result.voucher) : showKioskDone(result.voucher);
+      if (S.takeaway) {
+        saveVoucher(result.access_token, result.voucher.pickup_label);
+        if (result.voucher.pay_mode === "online" && result.voucher.online_pay?.available) {
+          // 先显示凭证页（付款按钮置灰、写「正在打开付款页…」）再去开付款页：网络慢时顾客看得到在等、也点不了第二次（测试总 B）
+          S.voucherToken = result.access_token;
+          S.voucher = result.voucher;
+          S.payOpening = result.access_token;
+          renderVoucher();
+          return goPay(result.access_token);
+        }
+        toast(result.voucher.delivery ? "下单成功" : S.remote ? "预订成功，请按时到店取餐付款" : "下单成功，请到前台付款", "success");
+        return showVoucher(result.access_token);
+      }
+      toast(S.pack ? "下单成功，这些菜会打包好给您 🥡" : "下单成功，厨房已收到 👨‍🍳", "success");
+      S.pack = false;
+      await loadOrdered();
+      renderMenu();
+    } catch (err) {
+      // 限量的菜在看菜单之后被别人买走了：重新拿菜单，购物车改成还剩的份数，弹层里说清楚，顾客确认后再提交
+      if (err.status === 409 && err.data && err.data.code === "STOCK_SHORT") {
+        await loadMenu().catch(() => {}); // loadMenu 里会按新的份数改购物车
+        stockMsg = { name: err.data.item_name || (itemById(err.data.item_id) || {}).name || "", left: Number(err.data.left) || 0 };
+        renderMenu();
+        if (!S.cart.size) { m.remove(); toast(I18N.t(`「${stockMsg.name}」已经卖完了`), "error"); return; }
+        const [b, f] = render();
+        $(".sb", m).innerHTML = b; $(".sf", m).innerHTML = f;
+        $(".sb", m).scrollTop = 0;
+        return;
+      }
+      toast(err.message, "error");
+      submit.disabled = false;
+      submit.textContent = "重新提交";
+      if (/下架|售罄|刷新菜单/.test(err.message)) { await loadMenu(); renderMenu(); }
+    }
+  });
+}
+
+// ================= v1.26 同桌共享购物车（只有桌贴码；服务器见 src/services/tableCart.js） =================
+// 一张桌的几台手机看到、编辑同一个购物车：每台手机只改自己加的菜（S.cart 还是「我加的」），别人加的在 SC.others；
+// 点「+」先改本机、300 毫秒内的合成一批发给服务器（不是每点一下发一次）；服务器有变化时在 /ws 上推版本号，再来拿整个购物车。
+// SC = null：没开共享购物车（外带码、平板点餐机、店里关了、服务员点单），和以前一样各点各的。
+let SC = null;
+let live = null; // connectLive 的句柄：订阅这桌的频道
+// 这台手机在这一桌、这一轮的编号：存在 localStorage（按桌台码 + epoch），同一台手机开新标签页、重新扫码还是同一台「手机 N」，
+// 不会多占位置；换了一轮（结账以后）就是新的编号
+const GID_KEY = "pos_cart_gid:" + (customerToken || "");
+const newGid = () => "g" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+let curGid = null;
+function savedGid() { try { const x = JSON.parse(localStorage.getItem(GID_KEY) || "null"); return x && /^[\w-]{8,40}$/.test(x.gid) ? x : null; } catch { return null; } }
+function cartGid() { if (!curGid) curGid = savedGid()?.gid || newGid(); return curGid; }
+function keepGid(epoch) { try { localStorage.setItem(GID_KEY, JSON.stringify({ epoch, gid: cartGid() })); } catch {} }
+const newLid = () => "l" + Math.random().toString(36).slice(2, 9) + (Date.now() % 1e6).toString(36);
+const phoneLabel = (n) => `手机 ${n}`;
+const cartUrl = () => `/api/public/tables/${encodeURIComponent(customerToken)}/cart`;
+const lineSig = (l) => JSON.stringify([l.id, l.options || [], l.note || "", l.qty]);
+
+// 打开页面 / 店里改了设置：问一下服务器这桌有没有共享购物车
+async function loadShared() {
+  if (!customerToken || S.takeaway || S.kiosk || S.cartFull) { SC = null; return false; }
+  if (SC && SC.ended) return true; // 这一轮已经结束：等顾客重新打开
+  let d;
+  try {
+    d = await api(`${cartUrl()}?g=${encodeURIComponent(cartGid())}`, { auth: false });
+  } catch (err) {
+    if (err.status === 404 && ["CART_OFF", "CART_NONE"].includes(err.data?.code)) { SC = null; return false; } // 店里关了：各点各的
+    if (SC) return true; // 网络一时不好：保持现状
+    throw err;
+  }
+  // 页面开着的时候这一桌换了一轮（结账、作废、太久没人动……）：不自动加入新一桌，提示重新扫码 / 重新打开
+  if (SC && SC.epoch !== d.epoch) { scEnded(SC.resetWhy || "stale"); return true; }
+  const first = !SC;
+  if (first) {
+    const saved = savedGid();
+    if (saved && saved.epoch !== d.epoch) { curGid = newGid(); d.me = null; } // 上一轮存的编号：新的一轮用新编号
+    keepGid(d.epoch);
+    // 这桌一起点餐的手机满了：这台手机单独点、单独下单（和以前一样），自己选的菜不丢
+    if (d.full && d.me == null) return scFull();
+  }
+  applyDraft(d);
+  if (first) {
+    SC.shownSent = SC.lastSent ? SC.epoch + ":" + SC.lastSent.v : null; // 刚打开页面：不显示之前的「已送到厨房」
+    if (SC.me == null) scJoin();
+  }
+  return true;
+}
+// 这桌一起点餐的手机满了：退回每台手机各点各的（本机购物车留着）
+function scFull() {
+  if (SC) clearTimeout(SC.timer);
+  SC = null;
+  S.cartFull = true;
+  toast(I18N.t("这桌一起点餐的手机太多了，这台手机单独点菜、单独下单"), "error");
+  document.querySelector(".sc-sheet")?.remove();
+  if ($("#menuItems")) renderMenu();
+  return false;
+}
+// 这一轮结束了（结账、作废、换二维码、转台 / 并台、太久没人动；或者老页面写不进去）：盖一层提示，请顾客重新扫码 / 重新打开
+function scEnded(reason, to) {
+  if (!SC) return;
+  SC.ended = true;
+  clearTimeout(SC.timer); SC.timer = null; SC.outbox = null;
+  document.querySelectorAll(".sc-sheet, .dup-sheet").forEach((x) => x.remove());
+  $("#scEnded")?.remove(); $("#scMoved")?.remove();
+  const el = document.createElement("div");
+  el.className = "sc-ended"; el.setAttribute("role", "alert");
+  el.id = to ? "scMoved" : "scEnded";
+  const msg = to ? `这桌已经换到 ${to} 桌，请扫 ${to} 桌上的二维码继续点餐`
+    : reason === "expired" ? "购物车太久没人动，已经清空。要接着点菜，请重新打开"
+    : "这一桌的点餐已经结束。要接着点菜，请重新扫桌上的二维码";
+  el.innerHTML = `<div class="sc-ended-card"><p>${esc(msg)}</p><button type="button" class="btn primary big" data-reopen>重新打开</button></div>`;
+  el.addEventListener("click", (e) => { if (e.target.closest("[data-reopen]")) location.reload(); });
+  document.body.appendChild(el);
+}
+// 加入这桌（拿到「手机 N」）
+function scJoin() { SC.extra.push({ op: "join" }); scFlush(); }
+
+// 服务器上的购物车 → 本机
+function applyDraft(d, { force = false } = {}) {
+  const was = SC;
+  const epochChanged = Boolean(was && was.epoch !== d.epoch);
+  if (!SC) SC = { base: new Map(), outbox: null, noteLocal: null, headLocal: null, extra: [], others: [], subKey: null, shownSent: null, version: -1 };
+  let hadMine = false;
+  if (epochChanged) {
+    // 换了一轮（结账、作废、转台、太久没人动……）：上一轮没下单的菜都不要了，老的操作也不再发
+    hadMine = S.cart.size > 0 || was.others.length > 0;
+    S.cart.clear(); SC.base = new Map(); SC.outbox = null; SC.noteLocal = null; SC.headLocal = null; SC.extra = []; S.guests = null;
+  }
+  // 别的手机刚下了单（或者别人去掉了我的菜）：这些行已经「死」了。本机还没发出去的「+」按差额变成新的一行，
+  // 下过的那部分绝不再发（以前会把整行原样再发一次，厨房多做一份）
+  const dead = new Set(d.dead || []);
+  // 还在路上（发出去还没收到回复、或者要重发）的那一批里改过的行：先不算，等那一批的回复说清楚「实际改成了几份」再算
+  const pending = new Set(((SC.outbox && SC.outbox.ops) || []).filter((o) => o.op === "put").map((o) => o.line));
+  if (!epochChanged && dead.size) {
+    for (const [k, l] of [...S.cart]) {
+      if (!l.lid || !dead.has(l.lid) || pending.has(l.lid)) continue;
+      const extra = l.qty - ((SC.baseQty && SC.baseQty.get(l.lid)) || 0);
+      if (extra > 0) { l.lid = newLid(); l.qty = extra; } else S.cart.delete(k);
+      SC.rebased = true;
+    }
+  }
+  const dirty = !epochChanged && !force && scOps().length > 0;
+  const prevVersion = SC.version;
+  Object.assign(SC, { epoch: d.epoch, version: d.version, key: d.key, me: d.me, host: d.host, hostOnly: d.host_only, full: d.full,
+    note: d.note, head: d.head_count, guests: d.guests || [], lastSent: d.last_sent, fetchedAt: Date.now() });
+  const known = (l) => Boolean(itemById(l.menu_item_id));
+  const mine = d.me == null ? [] : d.lines.filter((l) => l.g === d.me);
+  SC.others = d.lines.filter((l) => l.g !== d.me && known(l));
+  SC.base = new Map(mine.map((l) => [l.id, lineSig({ id: l.menu_item_id, options: l.options, note: l.note, qty: l.qty })]));
+  SC.baseQty = new Map(mine.map((l) => [l.id, l.qty]));
+  if (!dirty) {
+    // 没有还没发出去的改动：本机购物车 = 服务器上我加的菜
+    S.cart = new Map(mine.filter(known).map((l) => [cartKey(l.menu_item_id, l.options) + "#" + (l.note || ""), { id: l.menu_item_id, options: l.options, note: l.note || "", qty: l.qty, lid: l.id }]));
+    if (force) { SC.noteLocal = null; SC.headLocal = null; SC.extra = []; }
+  }
+  if (SC.noteLocal != null && SC.noteLocal.trim() === (d.note?.text || "")) SC.noteLocal = null;
+  if (d.head_count) { S.guests = d.head_count; if (SC.headLocal === d.head_count) SC.headLocal = null; }
+  scSubscribe();
+  if (epochChanged) {
+    const why = SC.resetWhy; SC.resetWhy = null;
+    if (why === "expired" && hadMine) toast(I18N.t("购物车太久没人动，已经清空"), "error");
+    else if (hadMine && !SC.moved) toast(I18N.t("上一桌的点餐已经结束，购物车已经清空"), "error");
+  }
+  // 差额变成的新行（或者别的还没发出去的改动）：接着发
+  if (SC.rebased && !SC.ended && !SC.timer && !SC.inflight) { SC.rebased = false; scSync(); }
+  return SC.version !== prevVersion || epochChanged;
+}
+
+// 本机和服务器上「我加的菜」有什么不一样 → 要发的操作
+function scOps() {
+  if (!SC) return [];
+  const ops = [], seen = new Set();
+  for (const l of S.cart.values()) {
+    if (!l.lid) l.lid = newLid();
+    seen.add(l.lid);
+    if (SC.base.get(l.lid) !== lineSig(l)) ops.push({ op: "put", line: l.lid, item: l.id, options: l.options || [], note: l.note || "", qty: l.qty });
+  }
+  for (const lid of SC.base.keys()) if (!seen.has(lid)) ops.push({ op: "put", line: lid, qty: 0 });
+  if (SC.noteLocal != null && SC.noteLocal.trim() !== (SC.note?.text || "")) ops.push({ op: "note", text: SC.noteLocal.trim() });
+  if (SC.headLocal && SC.headLocal !== SC.head) ops.push({ op: "guests", n: SC.headLocal });
+  return ops.concat(SC.extra);
+}
+// 本机改了购物车：300 毫秒后合成一批发出去
+function scSync() {
+  if (!SC) return;
+  clearTimeout(SC.timer);
+  SC.timer = setTimeout(scFlush, 300);
+}
+async function scFlush() {
+  if (!SC || SC.ended) return;
+  clearTimeout(SC.timer); SC.timer = null;
+  if (SC.inflight) { SC.again = true; return; }
+  if (!SC.outbox) {
+    const ops = scOps();
+    if (!ops.length) return;
+    SC.outbox = { op_id: "o" + newLid(), ops };
+    SC.extra = [];
+  }
+  SC.inflight = true;
+  const box = SC.outbox;
+  try {
+    const d = await api(cartUrl(), { method: "POST", auth: false, body: { epoch: SC.epoch, guest_id: cartGid(), op_id: box.op_id, ops: box.ops } });
+    if (SC.outbox === box) SC.outbox = null;
+    SC.retry = 0;
+    scOffline(false);
+    // 这一批实际改成了几份（网络重试时服务器原样告诉我们）：先按这个记下「服务器上有几份」，再按差额算还没发出去的
+    if (d.applied) { if (!SC.baseQty) SC.baseQty = new Map(); for (const [lid, q] of Object.entries(d.applied)) SC.baseQty.set(lid, q); }
+    // 服务器说作废的行（重启后不确定是不是重发）：整行去掉，不按差额再加
+    for (const lid of d.dropped || []) for (const [k, l] of [...S.cart]) if (l.lid === lid) S.cart.delete(k);
+    applyDraft(d);
+    scRefreshUi();
+  } catch (err) {
+    if ((!err.status || err.status >= 500 || err.status === 429) && err.data?.code !== "CART_JOIN_LIMIT") {
+      // 网络不好：同一批稍后原样重发（服务器按 op_id 去重，不会加两次）
+      scOffline(true);
+      SC.retry = Math.min((SC.retry || 0) + 1, 4);
+      SC.timer = setTimeout(scFlush, 1000 * 2 ** SC.retry);
+    } else {
+      SC.outbox = null;
+      const code = err.data?.code;
+      if (code === "CART_STALE") { scEnded("stale"); return; }
+      if (code === "CART_FULL" || code === "CART_JOIN_LIMIT") { scFull(); return; }
+      if (err.data?.draft) applyDraft(err.data.draft, { force: true });
+      else await loadShared().catch(() => {});
+      toast(err.message, "error");
+      scRefreshUi(true);
+    }
+  } finally {
+    if (SC) { SC.inflight = false; if (SC.again || SC.rebased) { SC.again = false; SC.rebased = false; scSync(); } }
+  }
+}
+// 下单前：把还没发出去的都发完（最多等 6 秒）
+async function scSettle() {
+  for (let i = 0; i < 30 && SC && (SC.inflight || SC.outbox || scOps().length); i++) {
+    if (!SC.inflight) await scFlush(); else await new Promise((r) => setTimeout(r, 200));
+  }
+  return Boolean(SC) && !SC.inflight && !SC.outbox && !scOps().length;
+}
+
+// 拿最新的购物车（收到推送、重新连上、切回页面、每 10 秒兜底）
+let scFetchTimer = null, scFetching = false;
+function scFetch(soon = 80) {
+  if (!SC || SC.ended) return;
+  clearTimeout(scFetchTimer);
+  scFetchTimer = setTimeout(async () => {
+    if (scFetching) return scFetch(300);
+    scFetching = true;
+    try {
+      const was = Boolean(SC);
+      const on = await loadShared();
+      if (was && !on) { renderMenu(); document.querySelector(".sc-sheet")?.remove(); return; } // 店里刚关掉共享购物车
+      scRefreshUi();
+    } catch {} finally { scFetching = false; }
+  }, soon);
+}
+function scSubscribe() {
+  if (!SC || !live || SC.subKey === SC.key) return;
+  if (live.send({ type: "cart_sub", key: SC.key })) SC.subKey = SC.key;
+}
+// 服务器推来的消息
+function onCartMsg(msg) {
+  if (!SC || SC.ended) return;
+  if (msg.reset) {
+    // 店里关掉了共享购物车：退回各点各的（自己加的菜留着）；别的原因：这一轮结束了
+    if (msg.reset === "off") { SC.subKey = null; return scFetch(0); }
+    return scEnded(msg.reset, msg.to);
+  }
+  if (msg.v > SC.version) scFetch();
+}
+setInterval(() => {
+  if (!SC || document.hidden) return;
+  if (!live || !live.connected() || document.querySelector(".sc-sheet")) scFetch(0);
+}, 10000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && SC) { SC.subKey = null; scFetch(0); } });
+
+// 购物车变了以后：底部栏、菜单上的「+」（别人点走了限量的菜）、开着的购物车弹层、「已送到厨房」
+let scListSig = "";
+function scRefreshUi(full = false) {
+  if (!SC) return;
+  scShowSent();
+  if (typeof S.onSharedChange === "function") S.onSharedChange();
+  // 正在问「几位用餐」，别的手机已经答了：不用再问
+  if (document.querySelector(".guests-page") && SC.head) { S.guests = SC.head; app.innerHTML = ""; renderMenu(); return; }
+  if (document.querySelector(".closed-page, .guests-page, .kiosk-done")) return;
+  if (!$("#menuItems")) return;
+  // 别人加的限量菜会让「+」变灰：只有这种时候才重画菜单（不然只更新底部栏）
+  const sig = JSON.stringify([[...S.cart.values()].map(lineSig), SC.others.filter((l) => (itemById(l.menu_item_id) || {}).left != null || (l.options || []).length).map((l) => [l.menu_item_id, l.options, l.qty])]);
+  if (full || sig !== scListSig) { scListSig = sig; renderMenu(); } else renderCartBar();
+}
+function scOffline(on) {
+  let el = $("#scOffline");
+  if (!on) { el?.remove(); return; }
+  if (el) return;
+  el = document.createElement("div");
+  el.id = "scOffline"; el.className = "sc-float warn"; el.setAttribute("role", "status");
+  el.textContent = "网络不好，你加的菜会自动重新发送";
+  document.body.appendChild(el);
+}
+// 「已送到厨房 ✓（手机 2 提交）」：所有手机都显示几秒
+function scShowSent() {
+  const ls = SC?.lastSent;
+  if (!ls || ls.ago > 60000) return;
+  const k = SC.epoch + ":" + ls.v;
+  if (SC.shownSent === k) return;
+  SC.shownSent = k;
+  $("#scSent")?.remove();
+  const el = document.createElement("div");
+  el.id = "scSent"; el.className = "sc-float sent"; el.setAttribute("role", "status");
+  el.textContent = ls.g === SC.me ? "已送到厨房 ✓（你提交的）" : `已送到厨房 ✓（${phoneLabel(ls.g)} 提交）`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 8000);
+  loadOrdered().then(() => { refreshOrdered(); if ($("#menuItems") && !document.querySelector(".guests-page")) renderMenu(); }).catch(() => {});
+  const sh = document.querySelector(".sc-sheet");
+  if (sh && !SC.others.length && !S.cart.size) sh.remove();
+}
+// 最近 30 秒还在改购物车的别的手机
+function activeOthers() {
+  if (!SC) return [];
+  const age = Date.now() - SC.fetchedAt;
+  return SC.guests.filter((g) => g.n !== SC.me && g.edit_ago != null && g.edit_ago + age < 30000).map((g) => phoneLabel(g.n));
+}
+const othersQty = (id) => (SC ? SC.others.filter((l) => l.menu_item_id === id).reduce((s, l) => s + l.qty, 0) : 0);
+
+// ---------- 共享购物车弹层：按手机分组，全桌的菜、谁加的、总价；谁都可以下单 ----------
+function openSharedCart() {
+  let msg = ""; // 弹层最上面的提示（不够的菜、购物车变了、还在选菜……）
+  let askBusy = true; // 「手机 3 还在选菜」：问过一次、选了「现在下单」就不再问
+  const body = `<div class="sc-msg"></div><div id="scLines"></div>
+    <label class="order-note-field"><span>整单备注（可选，全桌一句）<small class="sc-note-by"></small></span><textarea id="orderNote" maxlength="50" rows="2" placeholder="如：尽快上菜、老人用餐做软一点"></textarea></label>`;
+  const m = sheet(`${esc(S.table.table_no)} 桌 · 一起点餐`, body, `<div class="sc-foot"></div>`);
+  m.classList.add("sc-sheet");
+  const note = $("#orderNote", m);
+  note.value = SC.noteLocal ?? SC.note?.text ?? "";
+  const rowHtml = (l, mine) => {
+    const i = itemById(mine ? l.id : l.menu_item_id);
+    if (!i) return "";
+    const text = optionsText(i, l.options);
+    const price = `<span class="num muted">${money(unitPrice(i, l.options) * l.qty)}</span>`;
+    if (mine) {
+      const key = cartKey(l.id, l.options) + "#" + (l.note || "");
+      return `<div class="row"><span class="n">${esc(i.name)}${text ? `<div class="item-opts">${esc(text)}</div>` : ""}
+          <button type="button" class="note-btn ${l.note ? "has" : ""}" data-lnote="${esc(key)}">${l.note ? "※ " + esc(l.note) : "+ 口味备注"}</button></span>
+        ${price}
+        <span class="stepper"><button type="button" class="minus" data-line="${esc(key)}" data-d="-1" aria-label="减少">${ICON.minus}</button><span class="q">${l.qty}</span><button type="button" class="plus ${maxAdd(i, l.options).max < 1 ? "capped" : ""}" data-line="${esc(key)}" data-d="1" aria-label="加一份">${ICON.plus}</button></span></div>`;
+    }
+    return `<div class="row other" data-oline="${esc(l.id)}"><span class="n">${esc(i.name)}${text ? `<div class="item-opts">${esc(text)}</div>` : ""}${l.note ? `<div class="item-opts note">※ ${esc(l.note)}</div>` : ""}</span>
+      ${price}<span class="q num">x${l.qty}</span><button type="button" class="sc-rm" data-rmo="${esc(l.id)}" aria-label="去掉">×</button></div>`;
+  };
+  const render = () => {
+    if (!m.isConnected) return;
+    const { count, total } = cartTotals();
+    const mineHtml = [...S.cart.values()].map((l) => rowHtml(l, true)).join("");
+    const groups = [...new Set(SC.others.map((l) => l.g))].sort((a, b) => a - b);
+    $("#scLines", m).innerHTML =
+      `<div class="sc-group" data-g="${SC.me ?? ""}"><div class="sc-gh">${SC.me != null ? `${phoneLabel(SC.me)}（我）` : "我"}</div>${mineHtml || `<div class="sc-empty">你还没有加菜</div>`}</div>`
+      + groups.map((g) => `<div class="sc-group" data-g="${g}"><div class="sc-gh">${phoneLabel(g)}</div>${SC.others.filter((l) => l.g === g).map((l) => rowHtml(l, false)).join("")}</div>`).join("")
+      + allergenCartNote() + packPick(true);
+    $(".sc-msg", m).innerHTML = msg;
+    $(".sc-note-by", m).textContent = SC.note && SC.noteLocal == null && SC.note.g !== SC.me ? `（${phoneLabel(SC.note.g)} 写的）` : "";
+    if (document.activeElement !== note && SC.noteLocal == null) note.value = SC.note?.text || "";
+    const blocked = SC.hostOnly && SC.host != null && SC.host !== SC.me;
+    $(".sc-foot", m).innerHTML = `<div class="sum num" style="flex:1;font-size:18px;font-weight:700">${money(total)} <small class="muted" style="font-size:12px;font-weight:400">全桌 ${countLabel(count)}</small></div>
+      <button class="btn primary big" id="submit" ${count && !blocked ? "" : "disabled"}>${blocked ? `请让 ${phoneLabel(SC.host)} 下单` : "确认下单"}</button>`;
+  };
+  S.onSharedChange = () => {
+    if (!m.isConnected) { S.onSharedChange = null; return; }
+    if (!S.cart.size && !SC.others.length && !msg) { m.remove(); return; }
+    render();
+  };
+  render();
+  note.addEventListener("input", () => { SC.noteLocal = note.value; scSync(); $(".sc-note-by", m).textContent = ""; });
+  const setMsg = (html) => { msg = html; render(); $(".sb", m).scrollTop = 0; };
+  const warn = (text) => `<div class="stock-msg" role="alert">${ICON.alert}<span>${text}</span></div>`;
+  m.addEventListener("click", async (e) => {
+    const ln = e.target.closest("[data-lnote]");
+    if (ln) {
+      const old = S.cart.get(ln.dataset.lnote);
+      const item = itemById(old.id);
+      return openNoteSheet(`「${item.name}」口味备注`, old.note, (nt) => {
+        // 改备注后这一行留在原来的位置，共享购物车里还是同一行（同一个编号，只改备注）
+        const nk = cartKey(item.id, old.options) + "#" + nt;
+        if (nk === ln.dataset.lnote) return;
+        const entries = [...S.cart];
+        const at = entries.findIndex(([k]) => k === ln.dataset.lnote);
+        const same = S.cart.get(nk);
+        if (same) { same.qty = Math.min(99, same.qty + old.qty); entries.splice(at, 1); }
+        else entries[at] = [nk, Object.assign({}, old, { note: nt })];
+        S.cart = new Map(entries);
+        scSync();
+        render();
+      });
+    }
+    const line = e.target.closest("[data-line]");
+    if (line) { changeLine(line.dataset.line, Number(line.dataset.d)); render(); renderMenu(); return; }
+    const rm = e.target.closest("[data-rmo]");
+    if (rm) {
+      const l = SC.others.find((x) => x.id === rm.dataset.rmo);
+      const i = l && itemById(l.menu_item_id);
+      if (!l || !confirm(I18N.t(`去掉 ${phoneLabel(l.g)} 加的「${i ? i.name : ""}」？`))) return;
+      SC.extra.push({ op: "put", line: l.id, qty: 0, other: true });
+      SC.others = SC.others.filter((x) => x !== l);
+      render(); renderCartBar();
+      return scFlush();
+    }
+    if (onPackClick(e, m)) return;
+    if (e.target.closest("[data-wait]")) { setMsg(""); return; }
+    const now = e.target.closest("[data-now]");
+    const submit = now || e.target.closest("#submit");
+    if (!submit || submit.disabled) return;
+    if (now) askBusy = false;
+    await doSubmit(now ? $("#submit", m) || now : submit);
+  });
+  async function doSubmit(btn) {
+    btn.disabled = true;
+    const label0 = btn.textContent;
+    btn.textContent = "下单中…";
+    const restore = () => { if (btn.isConnected) { btn.disabled = false; btn.textContent = label0; } };
+    if (!(await scSettle())) { toast(I18N.t("网络不好，请稍后再试"), "error"); return restore(); }
+    await loadShared().catch(() => {}); // 下单前再看一眼最新的（别人刚加的菜、谁还在选）
+    if (!SC.others.length && !S.cart.size) { m.remove(); return; }
+    const busy = activeOthers();
+    if (askBusy && busy.length) {
+      askBusy = false;
+      return setMsg(`<div class="sc-busy" role="alert">${ICON.alert}<span><b>${esc(busy.join("、"))} 还在选菜，确定现在下单吗？</b></span>
+        <div class="sc-busy-btns"><button type="button" class="btn" data-wait>等一下</button><button type="button" class="btn primary" data-now>现在下单</button></div></div>`);
+    }
+    try {
+      const r = await api(`${cartUrl()}/submit`, { method: "POST", auth: false, body: { epoch: SC.epoch, version: SC.version, guest_id: cartGid(), pack: Boolean(S.pack) } });
+      msg = "";
+      applyDraft(r.draft);
+      if (r.duplicate) toast(I18N.t(`已经由 ${phoneLabel(r.by)} 提交了`), "success");
+      else toast(S.pack ? "下单成功，这些菜会打包好给您 🥡" : "下单成功，厨房已收到 👨‍🍳", "success");
+      S.pack = false;
+      m.remove();
+      if (r.order) S.ordered = r.order;
+      await loadOrdered().catch(() => {});
+      scRefreshUi(true);
+    } catch (err) {
+      const code = err.data?.code;
+      if (err.data?.draft) applyDraft(err.data.draft, { force: true });
+      if (code === "STOCK_SHORT") {
+        await loadMenu().catch(() => {});
+        const cut = (err.data.cut || []).map((c) => (c.to > 0 ? `「${esc(c.name)}」（${phoneLabel(c.g)}）只剩 ${c.to} 份` : `「${esc(c.name)}」（${phoneLabel(c.g)}）已经卖完了`));
+        scRefreshUi(true);
+        if (!SC.others.length && !S.cart.size) { m.remove(); toast(err.message, "error"); return; }
+        return setMsg(warn(`<b>有的菜不够了，购物车已经改好，请再确认一下</b>${cut.map((c) => `<div class="sc-cut">${c}</div>`).join("")}`));
+      }
+      if (code === "CART_CHANGED") { scRefreshUi(); return setMsg(warn("<b>购物车刚刚有变化，请再确认一下</b>")); }
+      if (code === "CART_HOST_ONLY") { scRefreshUi(); return setMsg(warn(`<b>请让 ${phoneLabel(err.data.host)} 下单</b>`)); }
+      if (code === "CART_STALE") { m.remove(); scEnded("stale"); return; }
+      if (code === "CART_FULL") { m.remove(); scFull(); return; }
+      toast(err.message, "error");
+      restore();
+      if (/下架|售罄|刷新菜单/.test(err.message)) { await loadMenu().catch(() => {}); scRefreshUi(true); }
+    }
+  }
+  return m;
+}
+
+// ---------- 平板自助点餐机 ----------
+// 下单完成：大字显示取餐号，20 秒后（或点「完成」）清空，给下一位顾客用
+let kioskTimer = null;
+function showKioskDone(v, { paid = false, problem = "" } = {}) {
+  clearInterval(kioskTimer);
+  let sec = 20;
+  app.innerHTML = `<div class="kiosk-done">
+    <div class="kd-label">您的取餐号</div>
+    <div class="kd-no num">${esc(v.pickup_label)}</div>
+    ${v.dine_option ? `<div class="kd-dine">${v.dine_option === "here" ? "🍽 在这里吃" : "🥡 打包带走"}</div>` : ""}
+    ${problem ? `<div class="kd-tip">${esc(problem)}</div>`
+      : paid ? `<div class="kd-tip">✅ 已付款，正在制作</div><div class="muted">叫到取餐号请来取餐${S.kiosk.slip ? "；扫小票上的二维码，做好了手机会提醒" : ""}</div>`
+      : `<div class="kd-tip">${S.kiosk.slip ? "请拿好小票，到前台付款" : "请记住取餐号，到前台付款"}</div>
+    <div class="muted">付款后开始制作${S.kiosk.slip ? "；扫小票上的二维码，做好了手机会提醒" : ""}</div>`}
+    <div class="kd-total">${paid ? "已付" : "应付"} <b class="num">${money(v.total_cents)}</b></div>
+    <button class="btn primary big" id="kdOk">完成（<span id="kdSec">${sec}</span>）</button></div>`;
+  $("#kdOk").onclick = resetKiosk;
+  kioskTimer = setInterval(() => { sec--; const el = $("#kdSec"); if (el) el.textContent = sec; if (sec <= 0) resetKiosk(); }, 1000);
+}
+// 平板刷卡（第三批）：叫刷卡机收钱，每秒查一次结果；成功 → 「已付款」完成页；没成功 → 再刷 / 改现金 / 取消这一单
+async function kioskPay(access, v) {
+  clearInterval(kioskTimer);
+  const base = `/api/public/kiosk/${encodeURIComponent(customerToken)}/pay/${access}`;
+  const screen = (html) => { app.innerHTML = `<div class="kiosk-done kiosk-pay">${html}</div>`; };
+  const failed = (msg) => {
+    screen(`<div class="kd-label">取餐号 ${esc(v.pickup_label)}</div>
+      <div class="kd-tip">刷卡没成功</div><div class="muted">${esc(I18N.t(msg || "请再试一次"))}</div>
+      <div class="kd-total">应付 <b class="num">${money(v.total_cents)}</b></div>
+      <div class="kp-btns"><button class="btn primary big" id="kpRetry">💳 再刷一次</button>
+        <button class="btn big" id="kpCash">💶 改现金（到前台付）</button>
+        <button class="btn big" id="kpDrop">取消这一单</button></div>`);
+    $("#kpRetry").onclick = () => kioskPay(access, v);
+    $("#kpCash").onclick = async () => {
+      try { await api(`${base}/cash`, { method: "POST", auth: false }); showKioskDone(v); } catch (e) { toast(e.message, "error"); }
+    };
+    $("#kpDrop").onclick = async () => {
+      try { await api(`/api/public/takeaway/${access}/cancel`, { method: "POST", auth: false }); } catch {}
+      resetKiosk();
+    };
+    // 顾客走开了：2 分钟后回到开始页（这一单没付款，30 分钟后自动作废）
+    let idle = 120;
+    kioskTimer = setInterval(() => { if (--idle <= 0) resetKiosk(); }, 1000);
+  };
+  let r;
+  try { r = await api(base, { method: "POST", auth: false }); } catch (e) { return failed(e.message); }
+  screen(`<div class="kd-label">取餐号 ${esc(v.pickup_label)}</div>
+    <div class="kd-tip">💳 请在刷卡机上刷卡、插卡或碰一碰</div>
+    <div class="kd-total">应付 <b class="num">${money(v.total_cents)}</b></div>
+    <button class="btn big" id="kpCancel">取消刷卡</button>`);
+  // 取消：叫刷卡机停下，照样等刷卡机给出最后结果（停之前刚好刷成功的照样算已付款）
+  $("#kpCancel").onclick = async () => {
+    const b = $("#kpCancel");
+    b.disabled = true; b.textContent = I18N.t("正在取消…");
+    try { const x = await api(`${base}/cancel`, { method: "POST", auth: false }); if (x && x.hint) b.textContent = I18N.t(x.hint); } catch {}
+  };
+  const t0 = Date.now();
+  while (r && r.status === "pending") {
+    await new Promise((ok) => setTimeout(ok, 1000));
+    try { r = await api(base, { auth: false }); } catch (e) {}
+    // 很久都没有结果（收银电脑断网、重启）：不让顾客再刷，到前台核对
+    if (Date.now() - t0 > 360000) return showKioskDone(v, { problem: "刷卡结果要到前台核对，请拿取餐号到前台" });
+  }
+  if (r.status === "paid") return showKioskDone(v, { paid: true });
+  if (r.status === "error") return showKioskDone(v, { problem: r.message });
+  failed(r.message);
+}
+
+// 回到首页：清空购物车、关掉弹层；顾客换过语言的，换回默认语言
+let kioskLang = null;
+function resetKiosk() {
+  clearInterval(kioskTimer);
+  S.cart.clear(); S.orderNote = ""; S.q = ""; S.dine = null; S.payPick = null; S.cat = menuCats()[0]?.id;
+  try { sessionStorage.removeItem(CART_KEY); } catch {}
+  document.querySelectorAll(".sheet-mask, .zoom-mask, .modal-mask").forEach((e) => e.remove());
+  if (kioskLang && I18N.lang !== kioskLang) {
+    try { localStorage.setItem("pos_lang", JSON.stringify({ lang: kioskLang, mode: "single" })); } catch {}
+    return location.reload();
+  }
+  renderMenu();
+  window.scrollTo(0, 0);
+}
+function startKiosk() {
+  document.body.classList.add("kiosk");
+  try { kioskLang = JSON.parse(localStorage.getItem("pos_kiosk_lang") || "null"); } catch {}
+  if (!kioskLang) { kioskLang = I18N.lang; try { localStorage.setItem("pos_kiosk_lang", JSON.stringify(kioskLang)); } catch {} }
+  // 2 分钟没人碰：清空购物车回到首页
+  let last = Date.now();
+  for (const ev of ["pointerdown", "keydown", "scroll"]) document.addEventListener(ev, () => (last = Date.now()), { passive: true, capture: true });
+  setInterval(() => {
+    const busy = S.cart.size || document.querySelector(".sheet-mask, .zoom-mask") || S.q;
+    if (busy && Date.now() - last > 120000) { last = Date.now(); resetKiosk(); }
+  }, 5000);
+  // 点一下进入全屏（平板浏览器）
+  document.addEventListener("pointerdown", () => { if (!PosFullscreen.isOn()) PosFullscreen.request(); }, { once: true }); // 含 webkit 前缀（老的 iPad / 安卓平板）
+  // 店员退出：连点店名 5 下
+  let taps = [];
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#storeTitle")) return;
+    taps = [...taps.filter((t) => Date.now() - t < 3000), Date.now()];
+    if (taps.length < 5) return;
+    taps = [];
+    if (window.PosApp) return window.PosApp.call("changeServer").catch(() => {});
+    PosFullscreen.exit();
+    toast(I18N.t("已退出全屏"), "success");
+  });
+}
+
+// 购物车里的过敏原：含过敏原的菜逐个列出；网上预订（不在店里，没法当面问）要勾选确认
+// 菜名和过敏原之间的冒号：中文用「：」，外语用「: 」（以前外语页面上也是中文冒号）
+const algSep = () => (I18N.lang === "zh" ? "：" : ": ");
+function allergenCartNote() {
+  if (!S.allergens) return "";
+  const lines = [...S.cart.values()].map((l) => itemById(l.id)).concat((SC ? SC.others : []).map((l) => itemById(l.menu_item_id))).filter((i, n, arr) => i && arr.indexOf(i) === n)
+    // 菜名单独一段文字（整改 U9：菜名和冒号连在一起时整段查不到译文，菜名就不翻）
+    .map((i) => i.allergens == null ? `<div><span>${esc(i.name)}</span>${algSep()}<span class="muted">过敏原信息请询问店员</span></div>` : i.allergens.length ? `<div><span>${esc(i.name)}</span>${algSep()}${allergenNames(i)}</div>` : "").join("");
+  return `<div class="alg-cart"><b>${ICON.alert}<span>过敏原</span></b>${lines || `<div class="muted">所选菜品没有标注过敏原</div>`}
+    <div class="muted" style="font-size:12px">如有食物过敏，请在下单前告诉我们${S.storePhone ? `（电话 ${esc(S.storePhone)}）` : ""}。</div>
+    ${S.takeaway && S.remote ? `<label class="alg-ok"><input type="checkbox" id="algOk"> 我已查看以上过敏原信息</label>` : ""}</div>`;
+}
+
+// 网上预订：姓名、电话（记在手机上，下次自动填好）、取餐时间（尽快 或 每 15 分钟一档，往后 4 小时）
+function remoteFields() {
+  if (!S.contact) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem("pos_contact") || "{}"); } catch {}
+    S.contact = { name: saved.name || "", phone: saved.phone || "", pickup_time: "asap" };
+  }
+  // 取餐时间：尽快 / 15 分钟后 … 2 小时后（后面写上大约几点）/ 其他（写备注）；最长 2 小时
+  const hm = (min) => { const t = new Date(Date.now() + min * 60000); return `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`; };
+  const slots = [15, 30, 45, 60, 90, 120];
+  const c = S.contact;
+  if (!/^(asap|note|\+\d+)$/.test(c.pickup_time)) c.pickup_time = "asap";
+  const dv = S.delivery ? dvState() : null;
+  const delivering = dv && dv.mode !== "pickup";
+  return `${dv ? dvFields(dv) : ""}<div class="remote-fields">
+    <div class="rf-title">${delivering || isShop() ? "联系人" : "预订信息"}</div>
+    <label><span>${S.remoteNeed?.name === false && !delivering ? "姓名（可选）" : "姓名 *"}</span><input type="text" data-contact="name" maxlength="30" value="${esc(c.name)}" autocomplete="name"></label>
+    <label><span>${S.remoteNeed?.phone === false && !delivering ? "电话（可选）" : "电话 *"}</span><input type="tel" data-contact="phone" maxlength="20" value="${esc(c.phone)}" autocomplete="tel" inputmode="tel"></label>
+    ${dv?.mode === "ship" ? `<p class="dv-days">📦 ${esc(I18N.t("正常 {0} 天送达").replace("{0}", S.delivery.ship.days))}</p>` : `<label><span>${dv?.mode === "local" ? "送达时间" : "取餐时间"}</span><select data-contact="pickup_time">
+      <option value="asap" ${c.pickup_time === "asap" ? "selected" : ""}>尽快</option>
+      ${slots.map((m) => `<option value="+${m}" ${c.pickup_time === "+" + m ? "selected" : ""}>${m < 60 ? `${m} 分钟后（约 ${hm(m)}）` : `${m / 60} 小时后（约 ${hm(m)}）`}</option>`).join("")}
+      <option value="note" ${c.pickup_time === "note" ? "selected" : ""}>其他（写备注）</option></select></label>`}
+    <label data-pickup-note ${c.pickup_time === "note" && dv?.mode !== "ship" ? "" : "hidden"}><span>取餐时间备注 *</span><input type="text" data-contact="pickup_note" maxlength="30" value="${esc(c.pickup_note || "")}" placeholder="如：下班后大概 18:40 到"></label>
+    ${S.onlinePay?.mode === "optional" && !delivering ? `<div class="rf-title">付款方式</div>
+    <div class="pay-choice">
+      <label><input type="radio" name="payMode" data-contact="pay" value="online" ${c.pay !== "store" ? "checked" : ""}> 💳 网上付款（银行卡）</label>
+      <label><input type="radio" name="payMode" data-contact="pay" value="store" ${c.pay === "store" ? "checked" : ""}> 🏪 到店付款</label>
+    </div>` : ""}
+    <p class="muted" style="font-size:12px;margin:4px 0 0">${delivering ? (S.onlinePay ? "提交后请用银行卡网上付款，付款成功餐厅就开始准备。" : "送到时付款（货到付款）。") : S.onlinePay?.mode === "required" ? "提交后请用银行卡网上付款，付款成功餐厅就开始制作。" : S.onlinePay ? "网上付款成功后餐厅马上开始制作；选到店付款的，餐厅确认后开始制作。" : "餐厅确认后开始制作，到店报取餐号付款取餐。"}</p>
+  </div>`;
+}
+
+// ---------- 配送方式（电商版第 3 批）：到店自取 / 送货上门（按区域收运费）/ 快递邮寄 ----------
+// 选过的方式和地址记在手机上，下次自动填好
+function dvState() {
+  if (!S.dv) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem("pos_delivery") || "{}"); } catch {}
+    S.dv = { mode: "pickup", zone: "", address: "", postcode: "", city: "", ...saved };
+  }
+  if (S.dv.mode === "local" && !S.delivery?.local) S.dv.mode = "pickup";
+  if (S.dv.mode === "ship" && !S.delivery?.ship) S.dv.mode = "pickup";
+  if (S.dv.mode === "local" && !S.delivery.local.zones.some((z) => z.name === S.dv.zone)) S.dv.zone = S.delivery.local.zones.length === 1 ? S.delivery.local.zones[0].name : "";
+  return S.dv;
+}
+function saveDv() { try { localStorage.setItem("pos_delivery", JSON.stringify(S.dv)); } catch {} }
+// 运费（满额免运费）、还差多少到起送价
+function dvQuote(goods) {
+  if (!S.delivery) return { fee: 0 };
+  const d = dvState();
+  const free = (fee, freeAt) => (freeAt > 0 && goods >= freeAt ? 0 : fee);
+  if (d.mode === "local") {
+    const z = S.delivery.local.zones.find((x) => x.name === d.zone);
+    if (!z) return { fee: 0, noZone: true };
+    return { fee: free(z.fee_cents, z.free_cents), zone: z, short: goods < z.min_cents ? z.min_cents - goods : 0, freeAt: z.free_cents };
+  }
+  if (d.mode === "ship") {
+    // 产品单独设的邮费（每件）：加在基本运费上，满额免邮不免这部分
+    const extra = [...S.cart.values()].reduce((s, l) => s + ((itemById(l.id) || {}).ship_fee_cents || 0) * l.qty, 0);
+    return { fee: free(S.delivery.ship.fee_cents, S.delivery.ship.free_cents) + extra, extra, freeAt: S.delivery.ship.free_cents, short: 0 };
+  }
+  return { fee: 0 };
+}
+function dvFields(d) {
+  const L = S.delivery.local, P = S.delivery.ship;
+  const from = L ? Math.min(...L.zones.map((z) => z.fee_cents)) : 0;
+  const btn = (mode, icon, name, sub) => `<button type="button" data-dvmode="${mode}" class="${d.mode === mode ? "on" : ""}"><span class="dv-i">${icon}</span><b>${name}</b><small>${sub}</small></button>`;
+  return `<div class="remote-fields dv-box">
+    <div class="rf-title">配送方式</div>
+    <div class="dv-pick">${btn("pickup", "🏪", "到店自取", "免费")}${L ? btn("local", "🛵", "送货上门", from ? `${money(from)} 起` : "免运费") : ""}${P ? btn("ship", "📦", "快递邮寄", P.fee_cents ? money(P.fee_cents) : "免运费") : ""}</div>
+    ${d.mode === "local" ? `<label><span>送货区域 *</span><select data-dv="zone"><option value="">请选择</option>${L.zones.map((z) => `<option value="${esc(z.name)}" ${z.name === d.zone ? "selected" : ""}>${esc(z.name)} · ${z.fee_cents ? money(z.fee_cents) : I18N.t("免运费")}</option>`).join("")}</select></label>
+      <label><span>送货地址 *</span><input type="text" data-dv="address" maxlength="120" value="${esc(d.address)}" autocomplete="street-address" placeholder="街道、门牌号、楼层"></label>
+      <div class="dv-geo">${d.lat != null ? `<span class="dv-ok">📍 已记下您的位置</span><button type="button" class="btn small" data-geoclear>不用位置</button>` : `<button type="button" class="btn small" data-geo>📍 用我现在的位置</button><span class="muted">送货员可以直接导航过来</span>`}</div>`
+    : d.mode === "ship" ? `<label><span>邮寄地址 *</span><input type="text" data-dv="address" maxlength="120" value="${esc(d.address)}" autocomplete="street-address" placeholder="街道、门牌号"></label>
+      <div class="dv-two"><label><span>邮编 *</span><input type="text" data-dv="postcode" maxlength="10" value="${esc(d.postcode)}" autocomplete="postal-code" inputmode="numeric"></label>
+      <label><span>城市 *</span><input type="text" data-dv="city" maxlength="40" value="${esc(d.city)}" autocomplete="address-level2"></label></div>` : ""}
+  </div>`;
+}
+// 购物车里的运费一行 / 起送价提醒 / 再买多少免运费
+function dvSummary(q) {
+  if (!S.delivery || dvState().mode === "pickup") return "";
+  if (q.noZone) return `<div class="dv-sum muted">请选择送货区域，运费按区域算</div>`;
+  const name = dvState().mode === "local" ? "送货费" : "快递运费";
+  return `<div class="dv-sum"><div class="row"><span class="n">${name}</span><span class="num">${q.fee ? "+" + money(q.fee) : I18N.t("免运费")}</span></div>
+    ${q.short ? `<div class="stock-msg">${ICON.alert}<span>${esc(I18N.t("送货到「{0}」最低消费 {1}，还差 {2}").replace("{0}", q.zone.name).replace("{1}", money(q.zone.min_cents)).replace("{2}", money(q.short)))}</span></div>`
+      : q.fee && q.freeAt && q.fee > (q.extra || 0) ? `<div class="muted dv-free">${esc(I18N.t("满 {0} 免运费").replace("{0}", money(q.freeAt)))}</div>` : ""}
+    ${q.extra ? `<div class="muted dv-free">${esc(I18N.t("含部分产品的单独邮费 {0}").replace("{0}", money(q.extra)))}</div>` : ""}</div>`;
+}
+// 提交前检查：送货要区域、地址；邮寄要地址、邮编、城市；都要姓名电话
+function dvCheck(contact) {
+  if (!S.delivery) return null;
+  const d = dvState();
+  if (d.mode === "pickup") return null;
+  if (!contact.name.trim() || !contact.phone.trim()) return "送货、邮寄要填姓名和电话";
+  if (d.mode === "local" && !d.zone) return "请选择送货区域";
+  if (!String(d.address || "").trim()) return d.mode === "local" ? "请填写送货地址" : "请填写完整的邮寄地址（地址、邮编、城市）";
+  if (d.mode === "ship" && (!String(d.postcode || "").trim() || !String(d.city || "").trim())) return "请填写完整的邮寄地址（地址、邮编、城市）";
+  return null;
+}
+function dvPayload() {
+  const d = dvState();
+  return d.mode === "local" ? { mode: "local", zone: d.zone, address: d.address, lat: d.lat, lng: d.lng } : { mode: "ship", address: d.address, postcode: d.postcode, city: d.city };
+}
+
+// 口味备注：点常用备注或手写
+function openNoteSheet(title, current, onSave) {
+  const presets = S.notePresets;
+  // 拆分规则和收银台共用（common.js NoteText）：不按空格拆，法语「sans oignon」是一句
+  const { chosen, custom } = NoteText.parse(current, presets);
+  const m = sheet(esc(title),
+    `<div class="note-chips">${presets.map((p) => `<button type="button" class="${chosen.has(p) ? "on" : ""}" data-np="${esc(p)}">${esc(p)}</button>`).join("")}</div>
+     <input type="text" id="noteText" maxlength="30" value="${esc(custom)}" placeholder="其他要求（手写）" class="note-input">`,
+    `<button class="btn" id="noteClear">清除</button><button class="btn primary big" id="noteOk" style="flex:1">确定</button>`);
+  m.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-np]");
+    if (b) { chosen.has(b.dataset.np) ? chosen.delete(b.dataset.np) : chosen.add(b.dataset.np); b.classList.toggle("on"); }
+    if (e.target.closest("#noteClear")) { m.remove(); onSave(""); }
+    if (e.target.closest("#noteOk")) {
+      const note = NoteText.compose({ presets, chosen, text: $("#noteText", m).value, maxLen: 30 });
+      m.remove();
+      onSave(note);
+    }
+  });
+}
+
+// ---------- 外带凭证 ----------
+const VOUCHER_KEY = "takeaway_vouchers";
+function savedVouchers() {
+  try { return JSON.parse(store.get(VOUCHER_KEY) || "[]"); } catch { return []; }
+}
+function saveVoucher(token, label) {
+  const list = [{ token, label }, ...savedVouchers().filter((v) => v.token !== token)].slice(0, 5);
+  store.set(VOUCHER_KEY, JSON.stringify(list));
+}
+function forgetVoucher(token) {
+  store.set(VOUCHER_KEY, JSON.stringify(savedVouchers().filter((v) => v.token !== token)));
+}
+
+async function loadVoucher() {
+  try {
+    S.voucher = await api(`/api/public/takeaway/${S.voucherToken}`, { auth: false });
+  } catch (e) {
+    if (e.status === 404) forgetVoucher(S.voucherToken);
+    throw e;
+  }
+}
+
+// 网上付款：拿到支付平台的付款页地址，整页跳过去（付完会跳回凭证页）
+async function goPay(token) {
+  S.payOpening = token; // 凭证页重画（实时推送）时按钮也保持置灰
+  const btn = $("#vPay");
+  if (btn) { btn.disabled = true; btn.textContent = I18N.t("正在打开付款页…"); }
+  try {
+    const embed = Boolean(S.onlinePay?.embed) && (S.remote || location.protocol === "https:"); // 店里 WiFi（http）用不了卡号输入框，跳付款页
+    // 最多等 70 秒（支付平台慢时服务端每次等 30 秒、再重试一次，最长约 60 秒，页面不能先放弃，付款整改 P1）；按钮一直灰着防连点
+    const r = await Promise.race([
+      api(`/api/public/takeaway/${token}/pay`, { method: "POST", auth: false, body: { lang: I18N.lang, embed, t: customerToken } }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 70000)),
+    ]);
+    if (r.embed) { await openCardPay(token, r.embed); S.payOpening = null; const b = $("#vPay"); if (b) { b.disabled = false; b.textContent = I18N.t("💳 网上付款") + " " + money(r.embed.amount_cents); } return; }
+    location.href = r.pay_url;
+  } catch (e) {
+    // 支付平台慢 / 连不上（今天 Stripe 10–20 秒超时，店主 10-28）：说清楚是付款页打不开，订单还在，可以再点付款
+    toast(!e.status || e.status >= 500 ? I18N.t("付款页暂时打不开，请稍后再点付款") : e.message, "error", 8000);
+    S.payOpening = null;
+    await showVoucher(token).catch(() => {});
+    const b = $("#vPay");
+    if (b) b.disabled = false;
+  }
+}
+
+// ---------- 在本页直接输入卡号付款（不跳转）----------
+// 卡号只在支付平台的输入框里（Stripe / SumUp 的安全组件），直接发给支付平台，不经过餐厅的电脑。
+const loadedScripts = {};
+function loadScript(src) {
+  return (loadedScripts[src] ||= new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = resolve;
+    s.onerror = () => { delete loadedScripts[src]; reject(new Error(I18N.t("付款组件加载失败，请检查网络后重试"))); };
+    document.head.appendChild(s);
+  }));
+}
+const STRIPE_LOCALE = { zh: "zh", fr: "fr", en: "en", es: "es", pt: "pt" };
+async function openCardPay(token, e) {
+  const mask = sheet(I18N.t("💳 银行卡付款") + " " + money(e.amount_cents), `
+    <div id="cardBox" style="min-height:120px"><p class="muted">正在加载安全付款组件…</p></div>
+    <p id="cardErr" class="bad" style="min-height:1.2em;margin:8px 0 0"></p>
+    <p class="muted" style="font-size:12px;margin:6px 0 0">🔒 卡号直接加密发送给支付平台（${esc(e.provider === "sumup" ? "SumUp" : e.provider === "stripe" ? "Stripe" : "Test")}），餐厅看不到您的卡号。</p>`,
+    e.provider === "sumup" ? "" : `<button class="btn primary big" id="cardPay" style="width:100%" disabled>支付 ${money(e.amount_cents)}</button>`);
+  const err = (m) => { const el = $("#cardErr", mask); if (el) el.textContent = m || ""; };
+  // 卡号付完：查到已付才说收到；还没查到就显示「正在确认付款结果…」接着问（P5）
+  const done = async () => {
+    mask.remove(); S.payWait = token;
+    await showVoucher(token, { sync: true });
+    if (S.voucher?.status === "unpaid") pollPaid(token);
+    else { S.payWait = null; if (S.voucher?.status === "paid") toast(I18N.t("付款成功，餐厅开始为您准备"), "success"); }
+  };
+  const box = $("#cardBox", mask);
+  try {
+    if (e.provider === "stripe") {
+      await loadScript("https://js.stripe.com/v3/");
+      const stripe = window.Stripe(e.publishable_key, { locale: STRIPE_LOCALE[I18N.lang] || "auto" });
+      const elements = stripe.elements({ clientSecret: e.client_secret, appearance: { theme: "stripe", variables: { colorPrimary: (window.POS_THEME && window.POS_THEME.color) || "#c2410c", borderRadius: "10px" } } });
+      box.innerHTML = "";
+      const pe = elements.create("payment", { layout: "tabs" });
+      pe.mount(box);
+      pe.on("ready", () => { $("#cardPay", mask).disabled = false; });
+      $("#cardPay", mask).onclick = async (ev) => {
+        const b = ev.currentTarget;
+        b.disabled = true; b.textContent = I18N.t("正在付款…"); err("");
+        const r = await stripe.confirmPayment({ elements, confirmParams: { return_url: e.return_url }, redirect: "if_required" });
+        if (r.error) { err(r.error.message); b.disabled = false; b.textContent = I18N.t("支付") + " " + money(e.amount_cents); return; }
+        await done();
+      };
+    } else if (e.provider === "sumup") {
+      await loadScript("https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js");
+      box.innerHTML = `<div id="sumupCard"></div>`;
+      const loc = { zh: "en-GB", fr: "fr-FR", en: "en-GB", es: "es-ES", pt: "pt-PT" }[I18N.lang] || "fr-FR";
+      window.SumUpCard.mount({
+        id: "sumupCard", checkoutId: e.client_secret, locale: loc, showSubmitButton: true,
+        onResponse: (type, body) => {
+          if (type === "success") done();
+          else if (type === "error" || type === "fail") err(body?.message || I18N.t("付款没有成功，请检查卡号或换一张卡"));
+        },
+      });
+    } else {
+      // 测试模式（ONLINE_PAY_FAKE=1）：模拟卡号输入框，4242 开头算成功
+      const inp = 'style="width:100%;box-sizing:border-box;min-width:0"';
+      box.innerHTML = `<label class="field"><span>卡号</span><input id="fakeCard" ${inp} inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242"></label>
+        <div style="display:flex;gap:8px"><label class="field" style="flex:1;min-width:0"><span>有效期</span><input id="fakeExp" ${inp} placeholder="12/30"></label><label class="field" style="flex:1;min-width:0"><span>CVC</span><input id="fakeCvc" ${inp} placeholder="123"></label></div>`;
+      $("#cardPay", mask).disabled = false;
+      $("#cardPay", mask).onclick = async () => {
+        const ok = /^4242/.test($("#fakeCard", mask).value.replace(/\s/g, ""));
+        if (!ok) return err(I18N.t("付款没有成功，请检查卡号或换一张卡"));
+        await fetch(`/api/public/fakepay/${e.client_secret}/done?ok=1&json=1`);
+        await done();
+      };
+    }
+  } catch (ex) { err(ex.message); }
+}
+
+async function showVoucher(token, { sync = false } = {}) {
+  S.voucherToken = token;
+  history.replaceState(null, "", location.pathname + location.search + "#v=" + token);
+  try {
+    if (sync) S.voucher = await api(`/api/public/takeaway/${token}?sync=1`, { auth: false });
+    else await loadVoucher();
+  } catch (e) {
+    toast(e.message, "error");
+    return backToMenu();
+  }
+  renderVoucher();
+  window.scrollTo(0, 0);
+}
+
+function pollPaid(token, n = 0) {
+  setTimeout(async () => {
+    if (S.voucherToken !== token || S.payWait !== token) return;
+    try { S.voucher = await api(`/api/public/takeaway/${token}?sync=1`, { auth: false }); } catch {}
+    if (S.voucher?.status !== "unpaid" || n >= 40) {
+      S.payWait = null;
+      if (S.voucher?.status === "paid") toast(I18N.t("付款成功，餐厅开始为您准备"), "success");
+      else if (S.voucher?.status === "unpaid") toast(I18N.t("付款没有成功，请重新付款"), "error", 8000); // 一直查不到已付：付款按钮重新出现（P5）
+    }
+    if (S.voucherToken === token) renderVoucher();
+    if (S.payWait === token) pollPaid(token, n + 1);
+  }, 4000);
+}
+
+function backToMenu() {
+  S.voucherToken = null;
+  S.voucher = null;
+  history.replaceState(null, "", location.pathname + location.search);
+  renderMenu();
+}
+
+// 凭证上的取餐时间：具体时间 / 顾客写的取餐备注（整单备注里「取餐：…」）/ 尽快
+function pickupShow(v) {
+  if (v.pickup_time) return esc(v.pickup_time.slice(11, 16));
+  const m = /^取餐：([^；]*)/.exec(v.note || "");
+  return m ? esc(m[1]) : I18N.t("尽快");
+}
+
+const VOUCHER_STATUS = {
+  unpaid: ["待付款", "#e08a00", (v) => v.remote && v.pay_mode === "online"
+    ? `请完成网上付款，付款成功后餐厅马上开始制作。<br>取餐时间：<b>${pickupShow(v)}</b>，取餐号 <b>${v.pickup_label}</b>。`
+    : v.remote
+    ? `${v.accepted ? "餐厅已接单，正在为您准备。" : "已提交预订，等待餐厅确认。"}<br>取餐时间：<b>${pickupShow(v)}</b>。到店报取餐号 <b>${v.pickup_label}</b> 付款取餐。`
+    : `请到前台出示此页面，报取餐号 <b>${v.pickup_label}</b> 付款。<br>付款后才开始制作，${v.expire_minutes} 分钟内未付款将自动作废。`],
+  paid: ["已付款 · 制作中", "#1e8e3e", (v) => v.remote
+    ? `已付款，餐厅正在为您准备。<br>取餐时间：<b>${pickupShow(v)}</b>。到店报取餐号 <b>${v.pickup_label}</b> 取餐。`
+    : "已付款，正在为您制作，请留意叫号取餐。"],
+  picked_up: ["已取餐", "#7a746a", () => "已取餐，祝您用餐愉快！"],
+  refunded: ["已退款", "#7a746a", () => "已原路退款"], // 全额退款（测试总 F）
+  ready: ["做好了，可以取餐了！", "#16873f", (v) => `请到前台报取餐号 <b>${v.pickup_label}</b> 取餐。`],
+  cancelled: ["已作废", "#d93025", (v) => esc(v.cancel_reason || "订单已作废") + (v.online_pay?.refunded ? "<br>" + "已原路退款" : "")],
+};
+
+// 「做好了」提醒：手机响铃 + 振动。手机浏览器要先点一下页面才允许出声，所以凭证页有「开启提醒」按钮
+let audioCtx = null;
+function unlockAudio() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return true;
+  } catch { return false; }
+}
+document.addEventListener("pointerdown", unlockAudio, { once: true });
+function beep(times = 3) {
+  if (!audioCtx) return;
+  for (let n = 0; n < times; n++) {
+    [988, 1319, 1568].forEach((f, i) => {
+      const t0 = audioCtx.currentTime + n * 0.9 + i * 0.16;
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.35, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.35);
+      o.start(t0); o.stop(t0 + 0.37);
+    });
+  }
+}
+let wasReady = null;
+// 做好了：全屏绿色提醒 + 每 6 秒响铃、振动一次，直到顾客点「我知道了」（最多 3 分钟）；
+// 手机静音时浏览器不能出声，但振动照样有（安卓）；开过通知权限的还会弹系统通知（锁屏也能看到、会振动）
+let readyTimer = null;
+const VIBRATE = [500, 200, 500, 200, 1000];
+function readyAlert() {
+  const v = S.voucher;
+  const once = () => { beep(3); try { navigator.vibrate && navigator.vibrate(VIBRATE); } catch {} };
+  once();
+  clearInterval(readyTimer);
+  let n = 0;
+  readyTimer = setInterval(() => { if (++n > 30) return stopReady(); once(); }, 6000);
+  showSystemNotice(v);
+  document.querySelector(".ready-mask")?.remove();
+  const mask = document.createElement("div");
+  mask.className = "ready-mask";
+  mask.innerHTML = `<div class="rm-bell"><svg viewBox="0 0 24 24" width="60" height="60" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2.3 2.3 0 0 0 4 0"/></svg></div><div class="rm-t">做好了，可以取餐了！</div>
+    <div class="rm-no num">${esc(v?.pickup_label || "")}</div><div>请到前台报取餐号取餐。</div>
+    <button class="btn big" id="rmOk">我知道了</button>`;
+  mask.querySelector("#rmOk").onclick = stopReady;
+  document.body.appendChild(mask);
+  let t = 0;
+  const title = document.title;
+  const tt = setInterval(() => { document.title = t++ % 2 ? title : "🔔 " + I18N.t("做好了，可以取餐了！"); if (!document.querySelector(".ready-mask")) { clearInterval(tt); document.title = title; } }, 800);
+}
+function stopReady() {
+  clearInterval(readyTimer);
+  try { navigator.vibrate && navigator.vibrate(0); } catch {}
+  document.querySelector(".ready-mask")?.remove();
+}
+// 系统通知（要 https，也就是网上预订的外网地址；店里 WiFi 的 http 地址浏览器不允许）
+let swReg = null;
+async function enableSystemNotice() {
+  if (!window.isSecureContext || !("Notification" in window) || !("serviceWorker" in navigator)) return false;
+  try {
+    swReg = swReg || (await navigator.serviceWorker.ready);
+    const p = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+    return p === "granted";
+  } catch { return false; }
+}
+function showSystemNotice(v) {
+  if (!swReg || !("Notification" in window) || Notification.permission !== "granted") return;
+  swReg.showNotification(I18N.t("做好了，可以取餐了！"), {
+    body: I18N.t("请到前台报取餐号取餐。") + " " + (v?.pickup_label || ""), tag: "pos-ready", renotify: true, requireInteraction: true,
+    vibrate: VIBRATE, icon: "icon-192.png", badge: "icon-192.png",
+  }).catch(() => {});
+}
+// 等做好的时候：每 15 秒再查一次（手机锁屏后实时连接可能断了）
+setInterval(() => {
+  if (S.voucherToken && S.voucher && ["unpaid", "paid"].includes(S.voucher.status) && !S.voucher.ready && !document.hidden) {
+    loadVoucher().then(renderVoucher).catch(() => {});
+  }
+}, 15000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && S.voucherToken && S.voucher && !S.voucher.ready) loadVoucher().then(renderVoucher).catch(() => {});
+});
+
+// 送货上门 / 快递邮寄的订单状态：待付款 → 准备中 → 已送出 / 已寄出（不说「取餐」「取餐号」）
+function dvStatus(v, key) {
+  const ship = v.delivery.mode === "ship";
+  if (key === "cancelled" || key === "refunded") return VOUCHER_STATUS[key];
+  if (key === "unpaid") return ["待付款", "#e08a00", () => v.pay_mode === "online" ? "请完成网上付款，付款成功后我们马上开始准备。"
+    : v.accepted ? "已接单，正在准备，送到时付款。" : "已提交订单，等待确认，送到时付款。"];
+  if (key === "picked_up") return ship ? ["已寄出", "#1d4ed8", () => (v.delivery.tracking ? "已寄出，可以用下面的快递单号查询。" : "已寄出。")]
+    : ["已送出", "#1d4ed8", () => "已经在路上了，请保持电话畅通。"];
+  // paid / ready：都还在店里准备
+  return ["已付款 · 准备中", "#1e8e3e", () => (ship ? `正在打包，正常 ${esc(v.delivery.days)} 天送达，寄出后这里显示快递单号。` : "我们正在准备，准备好就给您送过去。")];
+}
+
+// 整单备注里给后厨看的【送货 …】【快递邮寄】标记，顾客页不显示（上面已经有配送信息）
+const vNote = (v) => String(v.note || "").replace(/^【(送货 [^】]*|快递邮寄)】/, "").trim();
+function renderVoucher() {
+  const v = S.voucher;
+  const key = v.status === "paid" && v.ready ? "ready" : v.status;
+  // 从「制作中」变成「可以取餐」：响铃提醒（页面刚打开时已经是可取餐就不响）
+  if (wasReady === false && key === "ready" && !v.delivery) readyAlert();
+  wasReady = key === "ready";
+  const [label, color, tip] = v.delivery ? dvStatus(v, key) : VOUCHER_STATUS[key];
+  const others = savedVouchers().filter((x) => x.token !== S.voucherToken);
+  app.innerHTML = `
+    <div class="head"><button id="back">‹ 点餐</button><h1>${v.delivery ? "我的订单" : "外带取餐凭证"}</h1></div>
+    <div class="voucher">
+      <div class="v-card" style="--c:${color}">
+        <div class="v-label">${v.delivery ? "订单号" : "取餐号"}</div>
+        <div class="v-no num">${v.pickup_label}</div>
+        <div class="v-status">${label}</div>
+        <p class="v-tip">${S.payWait && S.payWait === S.voucherToken && v.status === "unpaid" ? "正在确认付款结果…" : tip(v)}</p>
+      </div>
+      ${v.delivery ? `<div class="v-dv">${v.delivery.mode === "local" ? `<b>🛵 送货上门 · ${esc(v.delivery.zone)}</b><div>${esc(v.delivery.address)}</div><div class="muted">送达时间：${v.pickup_time ? esc(String(v.pickup_time).slice(11, 16)) : "尽快"}</div>`
+        : `<b>📦 快递邮寄</b><div>${esc(v.delivery.address)}, ${esc(v.delivery.postcode)} ${esc(v.delivery.city)}</div>${v.delivery.tracking ? `<div class="v-track">快递单号：${v.delivery.track_url ? `<a href="${esc(v.delivery.track_url)}" target="_blank" rel="noopener" translate="no"><b>${esc(v.delivery.tracking)}</b> ›</a><div class="muted" style="font-size:12px">点单号打开快递公司的查询页</div>` : `<b translate="no">${esc(v.delivery.tracking)}</b>`}</div>` : ""}`}</div>` : ""}
+      ${["unpaid", "paid"].includes(v.status) && !v.ready && !v.delivery ? `<button class="btn v-pay" id="vAlert" style="margin:10px 0 0;width:100%">${audioCtx && audioCtx.state === "running" ? "🔔 已开启：做好了会响铃、振动" : "🔔 做好了响铃 + 振动提醒我（点一下开启）"}</button>` : ""}
+      <div class="v-items">
+        ${vNote(v) ? `<div class="row"><span class="n item-opts">整单备注：${esc(vNote(v))}</span></div>` : ""}
+        ${v.items.map((i) => `<div class="row"><span class="n">${esc(i.name)}${i.options_text ? `<div class="item-opts">${esc(i.options_text)}</div>` : ""}${i.note ? `<div class="item-opts note">※ ${esc(i.note)}</div>` : ""}</span><span class="muted">x${i.qty}</span><span class="num">${money(i.price_cents * i.qty)}</span></div>`).join("")}
+        ${v.discount_cents ? `<div class="row"><span class="n">优惠</span><span class="num">-${money(v.discount_cents)}</span></div>` : ""}
+        ${(v.charges || []).map((c) => `<div class="row"><span class="n">${esc(c.note)}</span><span class="num">+${money(c.amount_cents)}</span></div>`).join("")}
+        <div class="row total"><span class="n">${v.status === "unpaid" ? "应付" : "合计"}</span><b class="num">${money(v.total_cents)}</b></div>
+        <div class="muted" style="font-size:12px;margin-top:6px">下单时间 ${esc(v.created_at)}</div>
+        ${v.status === "unpaid" && v.online_pay?.available && v.pay_mode === "online" && S.payWait !== S.voucherToken ? (S.payOpening === S.voucherToken ? `<button class="btn primary big v-pay" id="vPay" disabled>正在打开付款页…</button>` : `<button class="btn primary big v-pay" id="vPay">💳 网上付款 ${money(v.total_cents)}</button>`) : ""}
+      </div>
+      <div class="v-actions">
+        ${v.status === "unpaid" && !v.accepted ? `<button class="btn danger" id="vCancel">取消订单</button>` : ""}
+        <button class="btn primary" id="vMore">再点一单</button>
+      </div>
+      ${others.length ? `<div class="v-others">其他外带单：${others.map((o) => `<button class="btn small" data-v="${esc(o.token)}">${esc(o.label)}</button>`).join(" ")}</div>` : ""}
+    </div>`;
+  $("#back").onclick = backToMenu;
+  $("#vMore").onclick = backToMenu;
+  $("#vPay")?.addEventListener("click", () => goPay(S.voucherToken));
+  $("#vAlert")?.addEventListener("click", async () => {
+    if (unlockAudio()) beep(1);
+    try { navigator.vibrate && navigator.vibrate(200); } catch {}
+    const sys = await enableSystemNotice();
+    toast(I18N.t(sys ? "已开启提醒：做好了会响铃、振动并弹出通知" : "已开启提醒，做好了手机会响铃、振动"), "success");
+    renderVoucher();
+  });
+  $("#vCancel")?.addEventListener("click", async () => {
+    if (!confirm(I18N.t("确定取消这张外带单吗？"))) return;
+    try {
+      S.voucher = await api(`/api/public/takeaway/${S.voucherToken}/cancel`, { method: "POST", auth: false });
+      renderVoucher();
+    } catch (e) { toast(e.message, "error"); }
+  });
+  app.querySelectorAll("[data-v]").forEach((b) => (b.onclick = () => showVoucher(b.dataset.v)));
+}
+
+// 「已点」弹层开着时别的手机 / 服务员又下了单、退了菜、结了账：实时更新（v1.25.2，以前要关掉再打开才看得到）
+let orderedSheet = null, orderedSig = "";
+const orderedBody = (o) => (o.note ? `<div class="row"><span class="n item-opts">整单备注：${esc(o.note)}</span></div>` : "") +
+  o.items.map((i) => `<div class="row"><span class="n">${esc(i.name)}${i.options_text ? `<div class="item-opts">${esc(i.options_text)}</div>` : ""}${i.note ? `<div class="item-opts note">※ ${esc(i.note)}</div>` : ""}</span><span class="muted">x${i.qty}</span><span class="num">${money(i.price_cents * i.qty)}</span></div>`).join("");
+const orderedFoot = (o) => `<div style="flex:1">合计 <b class="num" style="font-size:18px">${money(o.subtotal_cents)}</b></div><span class="muted" style="font-size:12px">${customerToken ? "如需退菜/结账请联系服务员" : "退菜请在收银台操作"}</span>`;
+function openOrdered() {
+  const o = S.ordered;
+  if (!o) return;
+  orderedSheet = sheet(`${esc(S.table.table_no)} 桌 · 已点菜品`, orderedBody(o), orderedFoot(o));
+  orderedSig = JSON.stringify(o);
+}
+function refreshOrdered() {
+  const m = orderedSheet;
+  if (!m || !m.isConnected) { orderedSheet = null; return; }
+  const o = S.ordered;
+  // 结账 / 作废了（这桌没有单了）：关掉弹层
+  if (!o || !o.items.length) { m.remove(); orderedSheet = null; return; }
+  const sig = JSON.stringify(o);
+  if (orderedSig === sig) return; // 没变：不重画（免得滚动位置跳回顶部）
+  orderedSig = sig;
+  const sb = $(".sb", m), top = sb.scrollTop;
+  sb.innerHTML = orderedBody(o);
+  $(".sf", m).innerHTML = orderedFoot(o);
+  sb.scrollTop = top;
+}
+
+boot();
+</script>
+</body>
+</html>

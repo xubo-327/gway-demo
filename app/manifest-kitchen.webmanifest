@@ -1,0 +1,15 @@
+{
+  "name": "餐馆收银系统 · 厨房显示屏",
+  "short_name": "厨房屏",
+  "description": "厨房显示屏（局域网）",
+  "start_url": "/kitchen.html",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

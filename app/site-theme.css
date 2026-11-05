@@ -1,0 +1,614 @@
+/* 收银「点餐页 / 网上商城主题」卡片上的缩略小样：照搬一体版 cashier-yitiban public/site-theme.css（原来是网站 gway-site-builder 的主题选择卡片）。
+   颜色变量（--p、--g…、--sf-accent）由 site-theme.js 用 store-theme.js 按系统颜色算好写在 .tp-mini 上。 */
+.tp-mini {
+  --bg: #f4f2ee;
+  --panel: #fff;
+  --text: #1f1d1a;
+  --mute: #b7b0a5;
+  --r: 6px;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  aspect-ratio: 16/10;
+  padding-bottom: 8px;
+  overflow: hidden;
+  background: var(--bg);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.tp-mini span {
+  display: block;
+}
+.tp-mini .tp-hdr {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 9px;
+  background: var(--p);
+}
+.tp-mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--on-p);
+}
+.tp-name {
+  width: 44px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--on-p);
+  opacity: 0.85;
+}
+.tp-cart {
+  margin-left: auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--on-p) 35%, transparent);
+}
+.tp-mini .tp-hero {
+  position: relative;
+  flex: none;
+  height: 46%;
+  margin: 0 9px;
+}
+.tp-img {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r);
+  background: linear-gradient(135deg, var(--ph-1), var(--ph-2));
+}
+.tp-mini .tp-card {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  width: 46%;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-radius: var(--r);
+  background: var(--panel);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+.tp-h1 {
+  height: 5px;
+  border-radius: 2px;
+  background: var(--text);
+}
+.tp-h1.short {
+  width: 62%;
+}
+.tp-btn {
+  margin-top: 2px;
+  width: 40%;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--p);
+  box-shadow: inset 0 0 0 1px var(--p-edge, transparent);
+}
+.tp-mini .tp-grid {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin: 0 9px;
+}
+.tp-mini .tp-p {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+  padding: 4px;
+  overflow: hidden;
+  border-radius: var(--r);
+  background: var(--panel);
+}
+.tp-mini .tp-pimg {
+  flex: 1;
+  min-height: 0;
+  border-radius: calc(var(--r) - 2px);
+  background: var(--ph-1);
+}
+.tp-pname {
+  flex: none;
+  width: 70%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--mute);
+}
+.tp-price {
+  flex: none;
+  width: 34%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--sf-accent);
+}
+.tp-mini .tp-fx {
+  display: none;
+}
+.tp-fx i {
+  position: absolute;
+  border-radius: 50%;
+}
+
+/* 默认（以前的点餐页）：白底、主色顶栏、一行一道 */
+.tp-mini[data-k='default'] {
+  --bg: #fff;
+  --panel: #f6f5f2;
+}
+.tp-mini[data-k='default'] .tp-hero {
+  height: 30%;
+}
+.tp-mini[data-k='default'] .tp-grid {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+.tp-mini[data-k='default'] .tp-p {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border-bottom: 1px solid #eeece8;
+  border-radius: 0;
+}
+.tp-mini[data-k='default'] .tp-pimg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+/* 画廊 */
+.tp-mini[data-k='galerie'] {
+  --bg: #fff;
+  --r: 0;
+  --text: #1d1d1f;
+}
+.tp-mini[data-k='galerie'] .tp-hdr {
+  background: #fff;
+  border-bottom: 1px solid #e3e3df;
+}
+.tp-mini[data-k='galerie'] :is(.tp-mark, .tp-name) {
+  background: var(--text);
+}
+.tp-mini[data-k='galerie'] .tp-cart {
+  background: #e3e3df;
+}
+.tp-mini[data-k='galerie'] .tp-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.tp-mini[data-k='galerie'] :is(.tp-img, .tp-card) {
+  position: static;
+}
+.tp-mini[data-k='galerie'] .tp-card {
+  width: auto;
+  justify-content: center;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+}
+.tp-mini[data-k='galerie'] .tp-h1 {
+  height: 6px;
+}
+.tp-mini[data-k='galerie'] .tp-btn {
+  border-radius: 0;
+  background: var(--text);
+}
+.tp-mini[data-k='galerie'] .tp-p {
+  padding: 0;
+  background: none;
+}
+.tp-mini[data-k='galerie'] .tp-price {
+  background: var(--text);
+}
+/* 潮玩 */
+.tp-mini[data-k='pop'] {
+  --bg: var(--p-tint);
+  --r: 8px;
+}
+.tp-mini[data-k='pop'] .tp-hdr {
+  background: #fff;
+  border-bottom: 2px solid #17151a;
+}
+.tp-mini[data-k='pop'] .tp-mark {
+  background: var(--p);
+  border-radius: 50%;
+}
+.tp-mini[data-k='pop'] .tp-name {
+  background: #17151a;
+}
+.tp-mini[data-k='pop'] .tp-cart {
+  background: #e4ded6;
+}
+.tp-mini[data-k='pop'] .tp-hero {
+  background: var(--p);
+  border: 2px solid #17151a;
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 #17151a;
+}
+.tp-mini[data-k='pop'] .tp-img {
+  inset: 6px 6px 6px 50%;
+  border: 1.5px solid #17151a;
+  transform: rotate(2deg);
+}
+.tp-mini[data-k='pop'] .tp-card {
+  background: none;
+  box-shadow: none;
+  width: 42%;
+}
+.tp-mini[data-k='pop'] .tp-h1 {
+  background: var(--on-p);
+}
+.tp-mini[data-k='pop'] .tp-btn {
+  background: #fff;
+  box-shadow: 1.5px 1.5px 0 #17151a;
+}
+.tp-mini[data-k='pop'] .tp-p {
+  border: 1.5px solid #17151a;
+  box-shadow: 2px 2px 0 #17151a;
+}
+.tp-mini[data-k='pop'] .tp-price {
+  background: #17151a;
+}
+/* 工坊 */
+.tp-mini[data-k='atelier'] {
+  --bg: #e8e6db;
+  --panel: #f6f5ef;
+  --text: #2a2922;
+  --r: 8px;
+}
+.tp-mini[data-k='atelier'] .tp-hdr {
+  background: var(--bg);
+  border-bottom: 1px dashed #b9b39c;
+}
+.tp-mini[data-k='atelier'] .tp-mark {
+  background: var(--p);
+  border-radius: 50%;
+}
+.tp-mini[data-k='atelier'] .tp-name {
+  background: var(--text);
+}
+.tp-mini[data-k='atelier'] .tp-cart {
+  background: var(--p);
+}
+.tp-mini[data-k='atelier'] .tp-img {
+  left: 26%;
+  right: 26%;
+  top: 22%;
+  border-radius: 60px 60px 6px 6px;
+}
+.tp-mini[data-k='atelier'] .tp-card {
+  left: 25%;
+  right: 25%;
+  top: 0;
+  bottom: auto;
+  width: auto;
+  padding: 0;
+  align-items: center;
+  background: none;
+  box-shadow: none;
+}
+.tp-mini[data-k='atelier'] .tp-btn {
+  display: none;
+}
+.tp-mini[data-k='atelier'] .tp-p {
+  outline: 1px dashed #c7c2ae;
+  outline-offset: -3px;
+}
+.tp-mini[data-k='atelier'] .tp-price {
+  background: var(--sf-accent-ink);
+}
+/* 模块 */
+.tp-mini[data-k='module'] {
+  --bg: #eceef1;
+  --text: #14161b;
+  --r: 2px;
+  gap: 5px;
+}
+.tp-mini[data-k='module'] .tp-hdr {
+  background: #fff;
+  border-bottom: 1px solid #d2d6dd;
+}
+.tp-mini[data-k='module'] .tp-mark {
+  background: var(--p);
+}
+.tp-mini[data-k='module'] .tp-name {
+  background: var(--text);
+}
+.tp-mini[data-k='module'] .tp-cart {
+  background: #d2d6dd;
+  border-radius: 2px;
+}
+.tp-mini[data-k='module'] .tp-hero {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 4px;
+}
+.tp-mini[data-k='module'] :is(.tp-img, .tp-card) {
+  position: static;
+  border: 1px solid #d2d6dd;
+}
+.tp-mini[data-k='module'] .tp-img {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--p-dark) 14%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--p-dark) 14%, transparent) 1px, transparent 1px),
+    linear-gradient(135deg, var(--ph-1), var(--ph-2));
+  background-size:
+    10px 10px,
+    10px 10px,
+    auto;
+}
+.tp-mini[data-k='module'] .tp-card {
+  width: auto;
+  justify-content: flex-end;
+  box-shadow: none;
+}
+.tp-mini[data-k='module'] .tp-btn {
+  border-radius: 2px;
+}
+.tp-mini[data-k='module'] .tp-grid {
+  gap: 4px;
+}
+.tp-mini[data-k='module'] .tp-p {
+  border: 1px solid #d2d6dd;
+}
+.tp-mini[data-k='module'] .tp-price {
+  background: var(--text);
+}
+/* 市集 */
+.tp-mini[data-k='marche'] {
+  --bg: #f1f1ef;
+  --r: 4px;
+  gap: 5px;
+}
+.tp-mini[data-k='marche'] .tp-card {
+  background: var(--p);
+}
+.tp-mini[data-k='marche'] .tp-h1 {
+  background: var(--on-p);
+}
+.tp-mini[data-k='marche'] .tp-btn {
+  border-radius: 3px;
+  background: var(--on-p);
+}
+.tp-mini[data-k='marche'] .tp-grid {
+  gap: 5px;
+}
+.tp-mini[data-k='marche'] .tp-price {
+  width: 48%;
+  height: 7px;
+}
+/* 渐变系：光斑 */
+.tp-mini:is([data-k='aurore'], [data-k='nuit']) .tp-fx {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+.tp-mini:is([data-k='aurore'], [data-k='nuit']) .tp-hdr {
+  background: transparent;
+}
+.tp-mini:is([data-k='aurore'], [data-k='nuit']) .tp-mark {
+  background: linear-gradient(135deg, var(--g3d), var(--g1d) 55%, var(--g2d));
+}
+.tp-mini:is([data-k='aurore'], [data-k='nuit']) .tp-name {
+  background: var(--text);
+}
+.tp-mini:is([data-k='aurore'], [data-k='nuit']) .tp-card {
+  left: 10%;
+  right: 10%;
+  top: 0;
+  bottom: auto;
+  width: auto;
+  padding: 0;
+  align-items: center;
+  background: none;
+  box-shadow: none;
+}
+.tp-mini:is([data-k='aurore'], [data-k='nuit']) .tp-img {
+  top: 52%;
+  left: 8%;
+  right: 8%;
+}
+/* 极光 */
+.tp-mini[data-k='aurore'] {
+  --bg: #f6f6fa;
+  --text: #15151c;
+  --r: 8px;
+}
+.tp-mini[data-k='aurore'] .tp-fx i:nth-child(1) {
+  width: 70%;
+  aspect-ratio: 1;
+  left: -20%;
+  top: -40%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--g1) 50%, transparent),
+    transparent
+  );
+}
+.tp-mini[data-k='aurore'] .tp-fx i:nth-child(2) {
+  width: 70%;
+  aspect-ratio: 1;
+  right: -20%;
+  top: -35%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--g2) 46%, transparent),
+    transparent
+  );
+}
+.tp-mini[data-k='aurore'] .tp-h1 {
+  width: 100%;
+  height: 7px;
+  background: linear-gradient(90deg, var(--g3d), var(--g1d), var(--g2d));
+}
+.tp-mini[data-k='aurore'] .tp-h1.short {
+  width: 60%;
+}
+.tp-mini[data-k='aurore'] .tp-btn {
+  display: none;
+}
+.tp-mini[data-k='aurore'] .tp-img {
+  border: 2px solid rgba(255, 255, 255, 0.8);
+}
+.tp-mini[data-k='aurore'] .tp-p {
+  box-shadow: 0 4px 10px -6px color-mix(in srgb, var(--g1) 60%, transparent);
+}
+/* 夜幕 */
+.tp-mini[data-k='nuit'] {
+  --bg: #0f1016;
+  --panel: #181a23;
+  --text: #eef0f6;
+  --mute: #4b4f60;
+  --r: 7px;
+}
+.tp-mini[data-k='nuit'] .tp-fx i:nth-child(1) {
+  width: 70%;
+  aspect-ratio: 1;
+  left: -25%;
+  top: -40%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--g1) 60%, transparent),
+    transparent
+  );
+}
+.tp-mini[data-k='nuit'] .tp-fx i:nth-child(2) {
+  width: 60%;
+  aspect-ratio: 1;
+  right: -20%;
+  top: 10%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--g3) 50%, transparent),
+    transparent
+  );
+}
+.tp-mini[data-k='nuit'] .tp-cart {
+  background: var(--sf-accent);
+}
+.tp-mini[data-k='nuit'] .tp-img {
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(var(--ph-1), var(--ph-1)) padding-box,
+    conic-gradient(from 210deg, var(--g1), var(--g2), var(--g3), var(--g1)) border-box;
+}
+.tp-mini[data-k='nuit'] .tp-btn {
+  display: none;
+}
+.tp-mini[data-k='nuit'] .tp-p {
+  border: 1px solid #2c2f3d;
+}
+/* 玻璃 */
+.tp-mini[data-k='verre'] {
+  --r: 9px;
+  background:
+    radial-gradient(
+      60% 50% at 0% 0%,
+      color-mix(in srgb, var(--g2) 45%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      55% 45% at 100% 10%,
+      color-mix(in srgb, var(--g3) 40%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      60% 40% at 100% 100%,
+      color-mix(in srgb, var(--g2) 30%, transparent),
+      transparent 70%
+    ),
+    #eef0f6;
+}
+.tp-mini[data-k='verre'] .tp-hdr {
+  margin: 4px 6px 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+}
+.tp-mini[data-k='verre'] :is(.tp-mark, .tp-name) {
+  background: #14151c;
+}
+.tp-mini[data-k='verre'] .tp-mark {
+  background: linear-gradient(135deg, var(--g1d), var(--g2d));
+}
+.tp-mini[data-k='verre'] .tp-cart {
+  background: var(--p);
+}
+.tp-mini[data-k='verre'] .tp-img {
+  border: 1px solid rgba(255, 255, 255, 0.9);
+}
+.tp-mini[data-k='verre'] .tp-card {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.tp-mini[data-k='verre'] .tp-h1 {
+  background: #14151c;
+}
+.tp-mini[data-k='verre'] .tp-p {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+}
+/* 海报 */
+.tp-mini[data-k='affiche'] {
+  --bg: #f3f3f1;
+  --text: #121316;
+  --r: 7px;
+}
+.tp-mini[data-k='affiche'] .tp-hero {
+  border-radius: 10px;
+  overflow: hidden;
+  background:
+    radial-gradient(110% 80% at 0% 0%, var(--g3d), transparent 62%),
+    radial-gradient(90% 90% at 100% 100%, var(--g2d), transparent 62%), var(--g1d);
+}
+.tp-mini[data-k='affiche'] .tp-img {
+  left: auto;
+  right: 8px;
+  top: 12%;
+  bottom: auto;
+  width: 34%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.16);
+}
+.tp-mini[data-k='affiche'] .tp-card {
+  top: 8px;
+  bottom: auto;
+  width: 52%;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.tp-mini[data-k='affiche'] .tp-h1 {
+  height: 8px;
+  background: #fff;
+}
+.tp-mini[data-k='affiche'] .tp-btn {
+  background: #fff;
+}
+.tp-mini[data-k='affiche'] .tp-price {
+  background: var(--text);
+}
+
+/* ---- 收银里的卡片外框（网站原来用 Tailwind 写的，这里换成普通 CSS） ---- */
+.stt-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 10px; }
+.stt-top .btn { margin-left: auto; text-decoration: none; }
+.stt-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.stt-card { display: flex; flex-direction: column; overflow: hidden; padding: 0; text-align: left; font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); cursor: pointer; transition: box-shadow .15s; }
+.stt-card:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, .1); }
+.stt-card.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); cursor: default; }
+.stt-card .tp-mini { width: 100%; }
+.stt-txt { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px; }
+.stt-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.stt-fit { font-size: 12.5px; line-height: 1.4; }
+.stt-tag { padding: 0 6px; font-size: 11.5px; border-radius: 4px; background: rgba(0, 0, 0, .06); color: var(--muted); }
+.stt-on { margin-left: auto; padding: 1px 8px; font-size: 12px; font-weight: 600; border-radius: 99px; background: var(--accent-bg, var(--accent)); color: var(--on-accent); }

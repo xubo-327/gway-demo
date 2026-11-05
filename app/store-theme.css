@@ -1,0 +1,898 @@
+/*
+ * 点餐页 / 网上商城主题（店主 10-26）：一体版网站 gway-site-builder 的 10 套店面主题搬到 order.html。
+ * 只在根节点 <html data-store-theme="键"> 时生效（store-theme.js 按设置 site_theme 挂上去）；没选主题 = 以前的样子，这里一条都不起作用。
+ *   - 颜色一族（--p、--on-p、--p-tint、--sf-accent、--g1… 等）由 store-theme.js 按系统颜色算好写在 <html> 上；
+ *   - 下面先是字体，再是所有主题共用的 token（写在 body 上，默认值 = ① 暖意），再是共用规则（只读 token），
+ *     最后是每套主题自己的 token 和最有辨识度的几条版式规则。
+ *   - 只改样子：order.html 的元素、类名、交互一律不动。
+ * 字体：网站 next/font 打包的同一批字体，只取拉丁字母子集（public/vendor/fonts/，SIL OFL 1.1，见那里的 LICENSE.txt）；
+ *   中文一律用系统字体。浏览器只下载页面上真的用到的字体，所以只有选了那套主题才会下载它的字体（店里断网也照样显示，字体在本机）。
+ */
+
+/* ===================== 字体（拉丁子集；unicode-range 和网站一样，中文落到系统字体） ===================== */
+@font-face { font-family: "St Montserrat"; src: url(vendor/fonts/montserrat.woff2) format("woff2"); font-weight: 100 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Jost"; src: url(vendor/fonts/jost.woff2) format("woff2"); font-weight: 100 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Cormorant"; src: url(vendor/fonts/cormorant-garamond.woff2) format("woff2"); font-weight: 300 700; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St DM Sans"; src: url(vendor/fonts/dm-sans.woff2) format("woff2"); font-weight: 100 1000; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Bricolage"; src: url(vendor/fonts/bricolage-grotesque.woff2) format("woff2"); font-weight: 200 800; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Nunito"; src: url(vendor/fonts/nunito.woff2) format("woff2"); font-weight: 200 1000; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Young Serif"; src: url(vendor/fonts/young-serif.woff2) format("woff2"); font-weight: 400; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Space Grotesk"; src: url(vendor/fonts/space-grotesk.woff2) format("woff2"); font-weight: 300 700; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St JetBrains Mono"; src: url(vendor/fonts/jetbrains-mono.woff2) format("woff2"); font-weight: 100 800; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Barlow"; src: url(vendor/fonts/barlow-400.woff2) format("woff2"); font-weight: 400; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Barlow"; src: url(vendor/fonts/barlow-500.woff2) format("woff2"); font-weight: 500; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Barlow"; src: url(vendor/fonts/barlow-600.woff2) format("woff2"); font-weight: 600; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Barlow"; src: url(vendor/fonts/barlow-700.woff2) format("woff2"); font-weight: 700 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Barlow Condensed"; src: url(vendor/fonts/barlow-condensed-600.woff2) format("woff2"); font-weight: 100 600; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Barlow Condensed"; src: url(vendor/fonts/barlow-condensed-700.woff2) format("woff2"); font-weight: 700; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Barlow Condensed"; src: url(vendor/fonts/barlow-condensed-800.woff2) format("woff2"); font-weight: 800 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Jakarta"; src: url(vendor/fonts/plus-jakarta-sans.woff2) format("woff2"); font-weight: 200 800; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Manrope"; src: url(vendor/fonts/manrope.woff2) format("woff2"); font-weight: 200 800; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Unbounded"; src: url(vendor/fonts/unbounded.woff2) format("woff2"); font-weight: 200 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Urbanist"; src: url(vendor/fonts/urbanist.woff2) format("woff2"); font-weight: 100 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "St Archivo"; src: url(vendor/fonts/archivo.woff2) format("woff2"); font-weight: 100 900; font-stretch: 62% 125%; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+/* ===================== 共用 token（默认值 = ① 暖意 Chaleur） ===================== */
+[data-store-theme] body {
+  --st-sys: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --st-serif-cn: "Songti SC", STSong, SimSun, serif;
+  --st-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* 中性色 */
+  --st-bg: #f4f2ee;
+  --st-panel: #fff;
+  --st-sheet: #fff;
+  --st-soft: #ebe7df;
+  --st-line: #e4e0d8;
+  --st-text: #1f1d1a;
+  --st-muted: #645e55;
+  --st-field: #fff; /* 搜索框、输入框底色 */
+  /* 字 */
+  --st-font: "St Montserrat", var(--st-sys);
+  --st-font-head: var(--st-font);
+  --st-font-price: var(--st-font);
+  --st-font-mono: var(--st-font);
+  --st-hw: 800;
+  --st-htrack: -0.02em;
+  --st-hstretch: 100%;
+  --st-h2-s: 20px;
+  --st-name-w: 600;
+  --st-price: var(--sf-accent);
+  --st-price-s: 16px;
+  --st-price-w: 800;
+  --st-price-stretch: 100%;
+  /* 形 */
+  --st-r-card: 12px;
+  --st-r-img: 10px;
+  --st-img-inset: 0px;
+  --st-r-btn: 999px;
+  --st-r-ctl: 10px;
+  --st-r-search: 22px;
+  --st-r-chip: 999px;
+  --st-r-add: 999px;
+  --st-r-badge: 999px;
+  --st-r-sheet: 20px;
+  --st-bd: 0px solid transparent;
+  --st-sh-card: 0 1px 2px rgba(31, 29, 26, 0.06);
+  --st-sh-card-hover: 0 10px 24px -14px rgba(31, 29, 26, 0.35);
+  --st-lift-x: 0px;
+  --st-lift-y: -2px;
+  --st-card-bg: var(--st-panel);
+  --st-card-pad: 12px;
+  --st-card-gap: 10px;
+  /* 「+」按钮 */
+  --st-add-bg: var(--p);
+  --st-add-fg: var(--on-p);
+  --st-add-bd: 0px solid transparent;
+  --st-add-sh: 0 2px 6px -2px rgba(0, 0, 0, 0.35), inset 0 0 0 1px var(--p-edge, transparent);
+  /* 顶栏 */
+  --st-hdr-bg: var(--pattern-light, none) var(--p);
+  --st-hdr-fg: var(--on-p);
+  --st-hdr-bd: transparent;
+  --st-hdr-bdw: 0px;
+  --st-hdr-blur: none;
+  --st-hdr-chip: rgba(255, 255, 255, 0.18);
+  --st-hdr-chip-bd: transparent;
+  /* 左边分类栏 */
+  --st-cat-bg: var(--st-soft);
+  --st-cat-on: var(--st-panel);
+  /* 底部购物车条 */
+  --st-bar-bg: #1f1d1a;
+  --st-bar-fg: #fff;
+  --st-bar-sub: #b9b3aa;
+  --st-bar-bd: 0px solid transparent;
+  --st-bar-sh: 0 10px 28px -8px rgba(0, 0, 0, 0.45);
+  --st-bar-ghost: #4d4840;
+  --st-bar-off-bg: rgba(255, 255, 255, 0.12);
+  --st-bar-off-fg: rgba(255, 255, 255, 0.55);
+  --st-r-bar: 30px;
+  /* 动效 */
+  --st-dur: 0.2s;
+  --st-ease: ease-out;
+
+  /* 页面原有的颜色变量跟着主题（order.html、app.css 里的规则都读这些） */
+  --bg: var(--st-bg);
+  --panel: var(--st-panel);
+  --text: var(--st-text);
+  --muted: var(--st-muted);
+  --line: var(--st-line);
+  --line-soft: var(--st-line);
+  --surface-2: var(--st-soft);
+  --accent-text: var(--sf-accent);
+
+  background: var(--st-bg);
+  background-image: none;
+  color: var(--st-text);
+  font-family: var(--st-font);
+}
+
+/* ===================== 共用规则（只读 token） ===================== */
+[data-store-theme] .closed-page,
+[data-store-theme] .guests-page { background: var(--st-bg); }
+[data-store-theme] .head {
+  background: var(--st-hdr-bg);
+  color: var(--st-hdr-fg);
+  border-bottom: var(--st-hdr-bdw) solid var(--st-hdr-bd);
+  -webkit-backdrop-filter: var(--st-hdr-blur);
+  backdrop-filter: var(--st-hdr-blur);
+}
+[data-store-theme] .head h1 { font-family: var(--st-font-head); font-weight: var(--st-hw); letter-spacing: var(--st-htrack); }
+[data-store-theme] .head .tno,
+[data-store-theme] .head button { background: var(--st-hdr-chip); box-shadow: inset 0 0 0 1px var(--st-hdr-chip-bd); border-radius: var(--st-r-chip); color: inherit; }
+[data-store-theme] .head .tme { border-color: currentColor; border-radius: var(--st-r-chip); }
+[data-store-theme] .lang-float .i18n-switch { border-radius: var(--st-r-chip); }
+[data-store-theme] .banner,
+[data-store-theme] .pc-img,
+[data-store-theme] .pd-media { background: var(--st-soft); }
+[data-store-theme] .search-bar { background: var(--st-bg); border-bottom-color: var(--st-line); }
+[data-store-theme] .search-bar input { background-color: var(--st-field); border-radius: var(--st-r-search); color: var(--st-text); }
+[data-store-theme] .search-bar input:focus { background-color: var(--st-panel); }
+[data-store-theme] .shop-bar select,
+[data-store-theme] .shop-sort select { background-color: var(--st-panel); border-color: var(--st-line); border-radius: var(--st-r-search); color: var(--st-text); }
+/* 左边分类栏 */
+[data-store-theme] .cats { background: var(--st-cat-bg); }
+[data-store-theme] .cats button { color: var(--st-muted); }
+[data-store-theme] .cats button.on { background: var(--st-cat-on); color: var(--st-text); }
+[data-store-theme] .cats .n { border-radius: var(--st-r-badge); }
+/* 分类标题 */
+[data-store-theme] .cat-title h2 { font-family: var(--st-font-head); font-weight: var(--st-hw); letter-spacing: var(--st-htrack); font-stretch: var(--st-hstretch); font-size: var(--st-h2-s); line-height: 1.2; }
+/* 菜：手机上和默认一样一行一道、细线隔开（只换线的颜色）；宽屏默认就是一张张卡片，才套主题的卡片样子（只换样子，不改大小位置） */
+[data-store-theme] .dish { border-color: var(--st-line); }
+@media (min-width: 700px) {
+  [data-store-theme] .dish {
+    background: var(--st-card-bg);
+    border: var(--st-bd);
+    border-radius: var(--st-r-card);
+    box-shadow: var(--st-sh-card);
+    transition: transform var(--st-dur) var(--st-ease), box-shadow var(--st-dur) var(--st-ease);
+  }
+}
+[data-store-theme] .thumb-btn,
+[data-store-theme] .dish .thumb { border-radius: var(--st-r-img); }
+[data-store-theme] .dish .name,
+[data-store-theme] .pc-name { font-weight: var(--st-name-w); }
+[data-store-theme] .dish .code { background: var(--st-soft); color: var(--st-muted); }
+[data-store-theme] .dish .price,
+[data-store-theme] .pc-foot .price,
+[data-store-theme] .pd-price { font-family: var(--st-font-price); font-size: var(--st-price-s); font-weight: var(--st-price-w); font-stretch: var(--st-price-stretch); color: var(--st-price); }
+[data-store-theme] .pd-price { font-size: calc(var(--st-price-s) + 6px); }
+[data-store-theme] .alg-row { color: var(--st-muted); }
+[data-store-theme] .hot-badge,
+[data-store-theme] .new-badge,
+[data-store-theme] .low-badge { border-radius: var(--st-r-badge); }
+/* 「+」「−」 */
+[data-store-theme] .stepper .plus,
+[data-store-theme] .stepper .spec {
+  background: var(--st-add-bg);
+  color: var(--st-add-fg);
+  border: var(--st-add-bd);
+  border-radius: var(--st-r-add);
+  box-shadow: var(--st-add-sh);
+  transition: transform var(--st-dur) var(--st-ease), box-shadow var(--st-dur) var(--st-ease);
+}
+[data-store-theme] .stepper .minus { background: var(--st-panel); border-color: var(--st-line); border-radius: var(--st-r-add); color: var(--st-text); }
+[data-store-theme] .stepper button::after { border-radius: inherit; }
+[data-store-theme] .spec .n { border-color: var(--st-panel); background: var(--st-text); color: var(--st-panel); }
+[data-store-theme] .so-tag { background: var(--st-soft); color: var(--st-muted); border-radius: var(--st-r-ctl); }
+/* 电商版的产品卡片 */
+[data-store-theme] .pcard {
+  background: var(--st-card-bg);
+  border: var(--st-bd);
+  border-radius: var(--st-r-card);
+  box-shadow: var(--st-sh-card);
+  transition: transform var(--st-dur) var(--st-ease), box-shadow var(--st-dur) var(--st-ease);
+}
+[data-store-theme] .pc-img { border-radius: var(--st-r-img); overflow: hidden; }
+/* 字体宽一些的主题，长商品名两行放不下：多给一行，不截成省略号 */
+[data-store-theme] .pc-name { -webkit-line-clamp: 3; }
+@media (hover: hover) {
+  [data-store-theme] .pcard:hover,
+  [data-store-theme] .dish:hover { box-shadow: var(--st-sh-card-hover); transform: translate(var(--st-lift-x), var(--st-lift-y)); }
+}
+/* 底部购物车条 */
+[data-store-theme] .cartbar { background: var(--st-bar-bg); color: var(--st-bar-fg); border: var(--st-bar-bd); border-radius: var(--st-r-bar); box-shadow: var(--st-bar-sh); }
+[data-store-theme] .cartbar .sum small,
+[data-store-theme] .cartbar .sum .empty { color: var(--st-bar-sub); }
+[data-store-theme] .cartbar .go,
+[data-store-theme] .cartbar .ordered { border-radius: var(--st-r-btn); }
+[data-store-theme] .cartbar .ordered { border-color: var(--st-bar-ghost); color: inherit; }
+[data-store-theme] .cartbar .go:disabled { background: var(--st-bar-off-bg); color: var(--st-bar-off-fg); }
+/* 按钮、面板、弹出层 */
+[data-store-theme] .btn { border-radius: var(--st-r-ctl); }
+[data-store-theme] .btn.primary { border-radius: var(--st-r-btn); }
+[data-store-theme] .sheet { background: var(--st-sheet); color: var(--st-text); border-radius: var(--st-r-sheet) var(--st-r-sheet) 0 0; }
+[data-store-theme] .opt-panel { background: var(--st-sheet); color: var(--st-text); }
+[data-store-theme] .next-cat,
+[data-store-theme] .gway-link,
+[data-store-theme] .alg-foot,
+[data-store-theme] .cl-card,
+[data-store-theme] .gp-card,
+[data-store-theme] .v-card { border-radius: var(--st-r-card); }
+[data-store-theme] .next-cat,
+[data-store-theme] .cl-card,
+[data-store-theme] .gp-card { background: var(--st-panel); }
+[data-store-theme] .alg-foot { color: var(--st-muted); }
+[data-store-theme] .pd-page { background: var(--st-bg); }
+[data-store-theme] .pd-thumbs { background: transparent; }
+[data-store-theme] .pd-info h1,
+[data-store-theme] .cl-card h2,
+[data-store-theme] .gp-card h2 { font-family: var(--st-font-head); font-weight: var(--st-hw); letter-spacing: var(--st-htrack); font-stretch: var(--st-hstretch); }
+[data-store-theme] .pd-bar { background: var(--st-sheet); border-top-color: var(--st-line); }
+[data-store-theme] .pd-bar .pd-add { border-radius: var(--st-r-btn); }
+[data-store-theme] .stepper .plus:active,
+[data-store-theme] .stepper .spec:active { transform: scale(0.9); }
+
+/* 渐变系的背景光斑（极光、夜幕、玻璃）：铺在整个页面最底下，慢慢飘 */
+[data-store-theme="aurore"] body::before,
+[data-store-theme="nuit"] body::before,
+[data-store-theme="verre"] body::before {
+  content: "";
+  position: fixed;
+  inset: -20vh -20vw;
+  z-index: -1;
+  pointer-events: none;
+  animation: st-drift 22s ease-in-out infinite alternate;
+}
+@keyframes st-drift { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(4vw, 3vh, 0) scale(1.08); } }
+@media (prefers-reduced-motion: reduce) {
+  [data-store-theme] body::before { animation: none; }
+  [data-store-theme] .pcard,
+  [data-store-theme] .dish,
+  [data-store-theme] .stepper button { transition: none; }
+}
+
+/* =====================================================================
+   ② Galerie 画廊：精品极简——大留白、直角细线、衬线大标题、价格不着色
+   ===================================================================== */
+[data-store-theme="galerie"] body {
+  --st-font: "St Jost", var(--st-sys);
+  --st-font-head: "St Cormorant", Georgia, var(--st-serif-cn);
+  --st-hw: 600;
+  --st-htrack: -0.01em;
+  --st-h2-s: 28px;
+  --st-bg: #fff;
+  --st-panel: #fff;
+  --st-sheet: #fff;
+  --st-soft: #f2f2ef;
+  --st-field: #f2f2ef;
+  --st-line: #e3e3df;
+  --st-text: #1d1d1f;
+  --st-muted: #666;
+  --st-name-w: 450;
+  --st-price: var(--st-text);
+  --st-price-w: 500;
+  --st-r-card: 0px;
+  --st-r-img: 0px;
+  --st-r-btn: 0px;
+  --st-r-ctl: 0px;
+  --st-r-search: 0px;
+  --st-r-chip: 0px;
+  --st-r-add: 0px;
+  --st-r-badge: 0px;
+  --st-r-sheet: 0px;
+  --st-r-bar: 0px;
+  --st-sh-card: none;
+  --st-sh-card-hover: none;
+  --st-lift-y: 0px;
+  --st-card-bg: transparent;
+  --st-add-bg: transparent;
+  --st-add-fg: var(--st-text);
+  --st-add-bd: 1px solid var(--st-text);
+  --st-add-sh: none;
+  --st-hdr-bg: #fff;
+  --st-hdr-fg: var(--st-text);
+  --st-hdr-bd: var(--st-line);
+  --st-hdr-bdw: 1px;
+  --st-hdr-chip: transparent;
+  --st-hdr-chip-bd: var(--st-line);
+  --st-cat-bg: #fff;
+  --st-cat-on: #fff;
+  --st-bar-bg: #1d1d1f;
+  --st-bar-sh: none;
+  --st-dur: 0.45s;
+  --st-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+[data-store-theme="galerie"] .head h1 { font-weight: 600; }
+[data-store-theme="galerie"] .head .tno { font-size: 12px; letter-spacing: 0.04em; font-weight: 500; }
+[data-store-theme="galerie"] .cat-title { padding: 26px 0 6px; border-bottom: 1px solid var(--st-text); }
+[data-store-theme="galerie"] .cat-title h2 { line-height: 1.05; }
+[data-store-theme="galerie"] .cats { border-right: 1px solid var(--st-line); }
+[data-store-theme="galerie"] .cats button.on::before { width: 2px; background: var(--st-text); border-radius: 0; top: 16px; bottom: 16px; }
+[data-store-theme="galerie"] .cats button.on { font-weight: 500; }
+[data-store-theme="galerie"] .search-bar input { border-color: var(--st-line); background-color: #fff; }
+[data-store-theme="galerie"] .hot-badge,
+[data-store-theme="galerie"] .new-badge { background: #fff; color: var(--st-text); box-shadow: inset 0 0 0 1px var(--st-text); letter-spacing: 0.06em; font-weight: 500; }
+[data-store-theme="galerie"] .pcard { border: 0; }
+[data-store-theme="galerie"] .shop-grid { gap: 22px 14px; }
+[data-store-theme="galerie"] .cartbar .go { background: #fff; color: #1d1d1f; letter-spacing: 0.04em; }
+[data-store-theme="galerie"] .next-cat { border-color: var(--st-text); }
+
+/* =====================================================================
+   ③ Pop 潮玩：粗黑描边、硬投影、大圆角、歪着贴的贴纸
+   ===================================================================== */
+[data-store-theme="pop"] body {
+  --st-edge: #17151a;
+  --st-font: "St DM Sans", var(--st-sys);
+  --st-font-head: "St Bricolage", var(--st-sys);
+  --st-font-price: var(--st-font-head);
+  --st-hw: 800;
+  --st-htrack: -0.035em;
+  --st-h2-s: 22px;
+  --st-bg: var(--p-tint);
+  --st-panel: #fff;
+  --st-soft: #fff;
+  --st-field: #fff;
+  --st-line: #ddd6cc;
+  --st-text: #17151a;
+  --st-muted: #4f4a55;
+  --st-bd: 2.5px solid var(--st-edge);
+  --st-r-card: 22px;
+  --st-r-img: 14px;
+  --st-sh-card: 4px 4px 0 var(--st-edge);
+  --st-sh-card-hover: 7px 7px 0 var(--st-edge);
+  --st-lift-x: -2px;
+  --st-lift-y: -2px;
+  --st-r-ctl: 14px;
+  --st-r-sheet: 26px;
+  --st-price: var(--st-text);
+  --st-price-s: 18px;
+  --st-add-bd: 2.5px solid var(--st-edge);
+  --st-add-sh: 2px 2px 0 var(--st-edge);
+  --st-hdr-bg: #fff;
+  --st-hdr-fg: var(--st-text);
+  --st-hdr-bd: var(--st-edge);
+  --st-hdr-bdw: 2.5px;
+  --st-hdr-chip: var(--p-tint);
+  --st-hdr-chip-bd: var(--st-edge);
+  --st-cat-bg: #fff;
+  --st-cat-on: var(--p-tint);
+  --st-bar-bg: #fff;
+  --st-bar-fg: var(--st-text);
+  --st-bar-sub: var(--st-muted);
+  --st-bar-bd: 2.5px solid var(--st-edge);
+  --st-bar-sh: 4px 4px 0 var(--st-edge);
+  --st-bar-ghost: var(--st-edge);
+  --st-bar-off-bg: #eee9e2;
+  --st-bar-off-fg: #6d6874;
+  --st-dur: 0.22s;
+  --st-ease: cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+[data-store-theme="pop"] .head .tno { font-weight: 800; }
+[data-store-theme="pop"] .search-bar input,
+[data-store-theme="pop"] .shop-bar select,
+[data-store-theme="pop"] .shop-sort select { border: 2.5px solid var(--st-edge); }
+[data-store-theme="pop"] .cats { border-right: 2.5px solid var(--st-edge); }
+[data-store-theme="pop"] .cats button.on { font-weight: 800; }
+[data-store-theme="pop"] .cats button.on::before { width: 5px; background: var(--st-edge); }
+[data-store-theme="pop"] .cats .n { border: 2px solid var(--st-edge); line-height: 14px; }
+/* 分类标题：一张歪着贴的白色贴纸 */
+[data-store-theme="pop"] .cat-title { padding-top: 22px; }
+[data-store-theme="pop"] .cat-title h2 { display: inline-block; padding: 3px 16px 4px; background: #fff; border: 2.5px solid var(--st-edge); border-radius: 14px; box-shadow: 3px 3px 0 var(--st-edge); transform: rotate(-1.5deg); }
+[data-store-theme="pop"] .dish .thumb { border: 2px solid var(--st-edge); }
+[data-store-theme="pop"] .hot-badge,
+[data-store-theme="pop"] .new-badge { border: 2px solid var(--st-edge); transform: rotate(-6deg); font-weight: 800; }
+[data-store-theme="pop"] .pc-img { border-bottom: 2.5px solid var(--st-edge); border-radius: 0; }
+[data-store-theme="pop"] .cartbar .go { border: 2.5px solid var(--st-edge); box-shadow: 2px 2px 0 var(--st-edge); }
+[data-store-theme="pop"] .stepper .minus { border: 2.5px solid var(--st-edge); }
+[data-store-theme="pop"] .sheet,
+[data-store-theme="pop"] .opt-panel { border: 2.5px solid var(--st-edge); }
+[data-store-theme="pop"] .btn.primary { border: 2.5px solid var(--st-edge); box-shadow: 3px 3px 0 var(--st-edge); }
+[data-store-theme="pop"] .next-cat { border: 2.5px solid var(--st-edge); box-shadow: 3px 3px 0 var(--st-edge); }
+@media (min-width: 700px) {
+  [data-store-theme="pop"] .dish { border: var(--st-bd); }
+}
+
+/* =====================================================================
+   ④ Atelier 工坊：大地色、拱形图、缝线虚线边、衬线标题
+   ===================================================================== */
+[data-store-theme="atelier"] body {
+  --st-font: "St Nunito", var(--st-sys);
+  --st-font-head: "St Young Serif", Georgia, var(--st-serif-cn);
+  --st-hw: 400;
+  --st-htrack: -0.01em;
+  --st-h2-s: 23px;
+  --st-bg: #e8e6db;
+  --st-panel: #f6f5ef;
+  --st-sheet: #f6f5ef;
+  --st-soft: #dcd9cb;
+  --st-field: #f6f5ef;
+  --st-line: #c7c2ae;
+  --st-text: #2a2922;
+  --st-muted: #57534a;
+  --st-r-card: 20px;
+  --st-r-img: 14px;
+  --st-r-btn: 14px;
+  --st-r-ctl: 12px;
+  --st-r-search: 14px;
+  --st-r-chip: 12px;
+  --st-r-add: 12px;
+  --st-r-badge: 8px;
+  --st-sh-card: none;
+  --st-sh-card-hover: 0 12px 26px -18px rgba(42, 41, 34, 0.5);
+  --st-name-w: 700;
+  --st-price: var(--sf-accent-ink);
+  --st-add-sh: none;
+  --st-hdr-bg: var(--st-bg);
+  --st-hdr-fg: var(--st-text);
+  --st-hdr-bd: var(--st-line);
+  --st-hdr-bdw: 1.5px;
+  --st-hdr-chip: var(--st-panel);
+  --st-hdr-chip-bd: var(--st-line);
+  --st-cat-bg: var(--st-soft);
+  --st-cat-on: var(--st-panel);
+  --st-bar-bg: #2a2922;
+  --st-bar-sub: #c9c4b3;
+  --st-r-bar: 20px;
+  --st-dur: 0.35s;
+}
+[data-store-theme="atelier"] .head { border-bottom-style: dashed; }
+/* 缝线：卡片里一圈虚线 */
+[data-store-theme="atelier"] .pcard,
+[data-store-theme="atelier"] .next-cat,
+[data-store-theme="atelier"] .alg-foot { outline: 1.5px dashed var(--st-line); outline-offset: -5px; }
+/* 分类标题下面一条虚线（缝线） */
+[data-store-theme="atelier"] .cat-title { border-bottom: 1.5px dashed var(--st-line); }
+[data-store-theme="atelier"] .cats { border-right: 1.5px dashed var(--st-line); }
+[data-store-theme="atelier"] .cats button.on::before { border-radius: 0 3px 3px 0; }
+[data-store-theme="atelier"] .search-bar input { border-color: var(--st-line); }
+
+/* =====================================================================
+   ⑤ Module 模块：紧凑网格、细边框、等宽字的价格和编号、方块小标
+   ===================================================================== */
+[data-store-theme="module"] body {
+  --st-font: "St Space Grotesk", var(--st-sys);
+  --st-font-head: var(--st-font);
+  --st-font-mono: "St JetBrains Mono", Consolas, var(--st-sys); /* 中文不落到等宽宋体，用系统字体 */
+  --st-font-price: var(--st-font-mono);
+  --st-hw: 700;
+  --st-htrack: -0.03em;
+  --st-h2-s: 18px;
+  --st-bg: #eceef1;
+  --st-panel: #fff;
+  --st-soft: #e1e4e9;
+  --st-field: #fff;
+  --st-line: #d2d6dd;
+  --st-text: #14161b;
+  --st-muted: #565c68;
+  --st-r-card: 6px;
+  --st-r-img: 4px;
+  --st-r-btn: 6px;
+  --st-r-ctl: 4px;
+  --st-r-search: 4px;
+  --st-r-chip: 4px;
+  --st-r-add: 4px;
+  --st-r-badge: 3px;
+  --st-r-sheet: 8px;
+  --st-bd: 1px solid var(--st-line);
+  --st-sh-card: none;
+  --st-sh-card-hover: 0 0 0 1px var(--p);
+  --st-lift-y: 0px;
+  --st-card-pad: 10px;
+  --st-card-gap: 6px;
+  --st-price: var(--st-text);
+  --st-price-s: 15px;
+  --st-price-w: 600;
+  --st-add-sh: inset 0 0 0 1px var(--p-edge, transparent);
+  --st-hdr-bg: #fff;
+  --st-hdr-fg: var(--st-text);
+  --st-hdr-bd: var(--st-line);
+  --st-hdr-bdw: 1px;
+  --st-hdr-chip: var(--st-soft);
+  --st-cat-bg: #fff;
+  --st-cat-on: var(--st-bg);
+  --st-bar-bg: #14161b;
+  --st-r-bar: 8px;
+  --st-dur: 0.12s;
+  --st-ease: linear;
+}
+/* 等宽字只用在数字上（价格、编号、件数），分类名、说明这些字还是正文字体，不会变宽挤在一起 */
+[data-store-theme="module"] .dish .code,
+[data-store-theme="module"] .pc-n,
+[data-store-theme="module"] .cats .n,
+[data-store-theme="module"] .cartbar .sum { font-family: var(--st-font-mono); }
+[data-store-theme="module"] .cats { border-right: 1px solid var(--st-line); }
+[data-store-theme="module"] .cats button { font-weight: 500; border-bottom: 1px solid var(--st-line); }
+[data-store-theme="module"] .cats button.on { font-weight: 700; }
+[data-store-theme="module"] .cats button.on::before { top: 0; bottom: 0; width: 3px; border-radius: 0; }
+/* 分类标题前一个主色小方块 */
+[data-store-theme="module"] .cat-title { padding-top: 18px; }
+[data-store-theme="module"] .cat-title h2::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 10px; vertical-align: 0.1em; background: var(--p); box-shadow: inset 0 0 0 1px var(--p-edge, transparent); }
+[data-store-theme="module"] .dish .thumb { border: 1px solid var(--st-line); }
+[data-store-theme="module"] .pc-img { border-bottom: 1px solid var(--st-line); border-radius: 0; }
+/* 没图的产品：主色网格线 */
+[data-store-theme="module"] .pc-img .ph,
+[data-store-theme="module"] .pd-track .ph {
+  background-color: var(--ph-1);
+  background-image: linear-gradient(rgba(20, 22, 27, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 22, 27, 0.08) 1px, transparent 1px);
+  background-size: 16px 16px;
+  color: var(--sf-accent-ink);
+  font-family: var(--st-font-mono);
+}
+[data-store-theme="module"] .shop-grid { gap: 8px; }
+[data-store-theme="module"] .search-bar input { border-color: var(--st-line); }
+@media (min-width: 700px) {
+  [data-store-theme="module"] .dish { border: var(--st-bd); }
+  [data-store-theme="module"] .items { gap: 8px; }
+}
+
+/* =====================================================================
+   ⑥ Marché 市集：主色促销板标题、大价签、长条「+」、高密度
+   ===================================================================== */
+[data-store-theme="marche"] body {
+  --st-font: "St Barlow", var(--st-sys);
+  --st-font-head: "St Barlow Condensed", "St Barlow", var(--st-sys);
+  --st-font-price: var(--st-font-head);
+  --st-hw: 700;
+  --st-htrack: -0.005em;
+  --st-h2-s: 21px;
+  --st-bg: #f1f1ef;
+  --st-panel: #fff;
+  --st-soft: #e6e6e2;
+  --st-field: #fff;
+  --st-line: #deded9;
+  --st-text: #1a1a1a;
+  --st-muted: #5a5a56;
+  --st-r-card: 10px;
+  --st-r-img: 8px;
+  --st-r-btn: 8px;
+  --st-r-ctl: 8px;
+  --st-r-search: 8px;
+  --st-r-chip: 8px;
+  --st-r-add: 8px;
+  --st-r-badge: 3px;
+  --st-r-sheet: 14px;
+  --st-r-bar: 12px;
+  --st-price-s: 18px;
+  --st-price-w: 700;
+  --st-card-pad: 8px 10px 10px;
+  --st-card-gap: 8px;
+  --st-add-sh: inset 0 0 0 1px var(--p-edge, transparent);
+  --st-hdr-chip: rgba(0, 0, 0, 0.16);
+  --st-dur: 0.12s;
+}
+[data-store-theme="marche"] .head { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.14); }
+/* 分类标题：主色促销板 */
+[data-store-theme="marche"] .cat-title { padding-top: 14px; }
+[data-store-theme="marche"] .cat-title h2 { padding: 5px 12px 4px; background: var(--p); color: var(--on-p); border-radius: 6px; letter-spacing: 0.01em; box-shadow: inset 0 0 0 1px var(--p-edge, transparent); }
+[data-store-theme="marche"] .cat-title .cat-sub { margin-top: 6px; }
+/* 大价签 */
+[data-store-theme="marche"] .dish .price,
+[data-store-theme="marche"] .pc-foot .price { line-height: 1.1; padding: 1px 8px 0; background: var(--p-tint); border-radius: 4px; letter-spacing: -0.01em; }
+[data-store-theme="marche"] .dish .price small,
+[data-store-theme="marche"] .pc-foot .price small { font-family: var(--st-font); font-size: 12px; }
+/* 标签剪成价签形 */
+[data-store-theme="marche"] .hot-badge,
+[data-store-theme="marche"] .new-badge,
+[data-store-theme="marche"] .low-badge { clip-path: polygon(8px 0, 100% 0, 100% 100%, 8px 100%, 0 50%); padding-left: 13px; font-family: var(--st-font-head); letter-spacing: 0.01em; }
+[data-store-theme="marche"] .shop-grid { gap: 8px; }
+[data-store-theme="marche"] .cartbar .go { font-family: var(--st-font-head); letter-spacing: 0.01em; }
+
+/* =====================================================================
+   ⑦ Aurore 极光：浅底弥散光斑、双色渐变大字、带主色的柔光阴影
+   ===================================================================== */
+[data-store-theme="aurore"] body {
+  --st-font: "St Jakarta", var(--st-sys);
+  --st-font-head: var(--st-font);
+  --st-hw: 800;
+  --st-htrack: -0.04em;
+  --st-h2-s: 24px;
+  --st-bg: #f6f6fa;
+  --st-panel: #fff;
+  --st-soft: #eeeef5;
+  --st-field: rgba(255, 255, 255, 0.8);
+  --st-line: #e3e3ee;
+  --st-text: #15151c;
+  --st-muted: #585867;
+  --st-r-card: 22px;
+  --st-r-img: 16px;
+  --st-img-inset: 6px;
+  --st-r-ctl: 14px;
+  --st-r-sheet: 26px;
+  --st-sh-card: 0 1px 2px rgba(20, 20, 40, 0.05), 0 14px 34px -16px rgba(60, 50, 120, 0.3);
+  --st-sh-card-hover: 0 1px 2px rgba(20, 20, 40, 0.05), 0 22px 44px -16px rgba(60, 50, 120, 0.4);
+  --st-lift-y: -3px;
+  --st-add-bg: linear-gradient(135deg, var(--g1d), var(--g2d));
+  --st-add-fg: #fff;
+  --st-add-sh: 0 6px 14px -6px var(--g1);
+  --st-hdr-bg: rgba(255, 255, 255, 0.62);
+  --st-hdr-blur: blur(16px) saturate(1.4);
+  --st-hdr-fg: var(--st-text);
+  --st-hdr-bd: rgba(255, 255, 255, 0.9);
+  --st-hdr-bdw: 1px;
+  --st-hdr-chip: rgba(255, 255, 255, 0.85);
+  --st-hdr-chip-bd: var(--st-line);
+  --st-cat-bg: rgba(255, 255, 255, 0.55);
+  --st-cat-on: #fff;
+  --st-bar-bg: #15151c;
+  --st-dur: 0.3s;
+  --st-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+[data-store-theme="aurore"] body::before {
+  background:
+    radial-gradient(46vmax 36vmax at 22% 18%, color-mix(in srgb, var(--g1) 42%, transparent), transparent 70%),
+    radial-gradient(42vmax 34vmax at 80% 24%, color-mix(in srgb, var(--g2) 40%, transparent), transparent 70%),
+    radial-gradient(48vmax 36vmax at 50% 80%, color-mix(in srgb, var(--g3) 30%, transparent), transparent 70%);
+}
+/* 店名、分类标题、详情页标题：双色渐变字 */
+[data-store-theme="aurore"] .head h1,
+[data-store-theme="aurore"] .cat-title h2,
+[data-store-theme="aurore"] .pd-info h1 {
+  background: linear-gradient(100deg, var(--g3d), var(--g1d) 50%, var(--g2d));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-bottom: 0.06em;
+}
+@media (forced-colors: active) {
+  [data-store-theme="aurore"] .head h1,
+  [data-store-theme="aurore"] .cat-title h2,
+  [data-store-theme="aurore"] .pd-info h1 { background: none; color: CanvasText; }
+}
+[data-store-theme="aurore"] .search-bar { background: rgba(246, 246, 250, 0.8); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-bottom-color: transparent; }
+[data-store-theme="aurore"] .search-bar input { border-color: var(--st-line); }
+[data-store-theme="aurore"] .cats button.on { border-radius: 14px; margin: 2px 6px; width: calc(100% - 12px); box-shadow: 0 6px 16px -10px rgba(60, 50, 120, 0.5); }
+[data-store-theme="aurore"] .cats button.on::before { left: -6px; background: linear-gradient(var(--g1d), var(--g2d)); }
+[data-store-theme="aurore"] .dish .thumb { box-shadow: 0 0 0 3px #fff; }
+[data-store-theme="aurore"] .new-badge { background: linear-gradient(90deg, var(--g1d), var(--g2d)); color: #fff; }
+[data-store-theme="aurore"] .cartbar { background: linear-gradient(90deg, #15151c, #23233a); }
+[data-store-theme="aurore"] .cartbar .go,
+[data-store-theme="aurore"] .pd-bar .pd-add { background: linear-gradient(110deg, var(--g3d), var(--g1d) 50%, var(--g2d)); color: #fff; border: 0; }
+[data-store-theme="aurore"] .cartbar .go:disabled { background: var(--st-bar-off-bg); color: var(--st-bar-off-fg); }
+[data-store-theme="aurore"] .menu { background: none; }
+
+/* =====================================================================
+   ⑧ Nuit 夜幕：暗底、霓虹光晕、渐变描边（强调色已按暗底提亮，文字对比度 ≥ 4.5）
+   ===================================================================== */
+[data-store-theme="nuit"] { color-scheme: dark; }
+[data-store-theme="nuit"] body {
+  --st-font: "St Manrope", var(--st-sys);
+  --st-font-head: "St Unbounded", var(--st-sys);
+  --st-hw: 600;
+  --st-htrack: -0.02em;
+  --st-h2-s: 18px;
+  --st-bg: #0f1016;
+  --st-panel: #181a23;
+  --st-sheet: #181a23;
+  --st-soft: #13141c;
+  --st-field: #1f2130;
+  --st-line: #2c2f3d;
+  --st-text: #eef0f6;
+  --st-muted: #a6abbb;
+  --st-r-card: 18px;
+  --st-r-img: 13px;
+  --st-img-inset: 6px;
+  --st-r-ctl: 12px;
+  --st-r-sheet: 22px;
+  --st-sh-card: none;
+  --st-sh-card-hover: 0 0 40px -14px var(--g1);
+  --st-lift-y: -2px;
+  --st-add-sh: 0 6px 18px -6px var(--p), inset 0 0 0 1.5px var(--p-edge, transparent);
+  --st-hdr-bg: rgba(15, 16, 22, 0.78);
+  --st-hdr-blur: blur(16px);
+  --st-hdr-fg: var(--st-text);
+  --st-hdr-bd: var(--st-line);
+  --st-hdr-bdw: 1px;
+  --st-hdr-chip: rgba(255, 255, 255, 0.08);
+  --st-hdr-chip-bd: var(--st-line);
+  --st-cat-bg: rgba(19, 20, 28, 0.9);
+  --st-cat-on: var(--st-panel);
+  --st-bar-bg: #181a23;
+  --st-bar-sub: var(--st-muted);
+  --st-bar-bd: 1px solid var(--st-line);
+  --st-bar-sh: 0 10px 40px -10px var(--g1);
+  --st-bar-ghost: var(--st-line);
+  --st-dur: 0.3s;
+  /* 暗底上要换的几种浅色 */
+  --accent-soft: var(--p-tint);
+  --warn: #f5a524;
+  --warn-soft: #2a2214;
+  --warn-text: #f5c46b;
+  --occupied: #2d2614;
+  --billing: #3a1622;
+  --focus-ring: var(--sf-accent);
+}
+[data-store-theme="nuit"] body::before {
+  background:
+    radial-gradient(34vmax 28vmax at 0% 0%, color-mix(in srgb, var(--g1) 34%, transparent), transparent 70%),
+    radial-gradient(30vmax 26vmax at 100% 100%, color-mix(in srgb, var(--g3) 30%, transparent), transparent 70%),
+    radial-gradient(22vmax 18vmax at 90% 30%, color-mix(in srgb, var(--g2) 20%, transparent), transparent 70%);
+}
+/* 渐变描边卡片（菜：手机上和默认一样一行一道，只在宽屏的卡片上用） */
+[data-store-theme="nuit"] .pcard,
+[data-store-theme="nuit"] .next-cat,
+[data-store-theme="nuit"] .cl-card,
+[data-store-theme="nuit"] .gp-card {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--st-panel), var(--st-panel)) padding-box,
+    linear-gradient(150deg, var(--g1), var(--st-line) 35%, var(--st-line) 65%, var(--g3)) border-box;
+}
+@media (min-width: 700px) {
+  [data-store-theme="nuit"] .dish {
+    border: 1px solid transparent;
+    background:
+      linear-gradient(var(--st-panel), var(--st-panel)) padding-box,
+      linear-gradient(150deg, var(--g1), var(--st-line) 35%, var(--st-line) 65%, var(--g3)) border-box;
+  }
+}
+[data-store-theme="nuit"] .head h1 { font-family: var(--st-font); }
+[data-store-theme="nuit"] .cat-title h2 { text-shadow: 0 0 22px var(--g1); }
+[data-store-theme="nuit"] .cats button.on::before { background: var(--sf-accent); box-shadow: 0 0 12px var(--sf-accent); }
+[data-store-theme="nuit"] .cats .n { background: var(--sf-accent); color: #0f1016; }
+[data-store-theme="nuit"] .dish .thumb { box-shadow: 0 0 0 1px var(--st-line); }
+[data-store-theme="nuit"] .search-bar { background: rgba(15, 16, 22, 0.86); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+[data-store-theme="nuit"] .search-bar input { border-color: var(--st-line); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a6abbb' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E"); }
+[data-store-theme="nuit"] .search-bar input::placeholder { color: #8a8fa0; }
+[data-store-theme="nuit"] .cartbar .go { box-shadow: 0 0 22px -4px var(--p); }
+[data-store-theme="nuit"] .menu { background: none; }
+[data-store-theme="nuit"] .lang-float .i18n-switch { background: rgba(24, 26, 35, 0.92); color: var(--st-text); box-shadow: 0 0 0 1px var(--st-line); }
+/* 暗底：order.html / app.css 里写死白底、浅灰底的地方 */
+[data-store-theme="nuit"] :is(.pd-top, .zoom-info) { background: rgba(24, 26, 35, 0.96); border-color: var(--st-line); }
+[data-store-theme="nuit"] :is(.opt, .opt-qty button, .note-chips button, .dv-pick button, .pay-choice label, .gv, .gw-step button, .gp-grid button, .dine-pick button, .tables button, .pd-top .pd-share, .pd-bar .pd-cart, .sc-ended-card, .v-card, .v-dv, .sc-rm) { background: var(--st-panel); color: var(--st-text); border-color: var(--st-line); }
+[data-store-theme="nuit"] :is(.v-items, .remote-fields, .alg-legend div, .pd-specs th, .alg-foot) { background: var(--st-soft); color: var(--st-text); }
+[data-store-theme="nuit"] :is(input, select, textarea) { background-color: var(--st-field); color: var(--st-text); border-color: var(--st-line); }
+[data-store-theme="nuit"] .alg-cart { background: #2a2214; border-color: #5c4a22; }
+[data-store-theme="nuit"] :is(.alg-cart > b, .alg-names) { color: #f5c46b; }
+[data-store-theme="nuit"] :is(.pd-desc, .alg-foot) { color: var(--st-text); }
+[data-store-theme="nuit"] :is(.cl-msg, .cl-week tr.today td, .cl-hours a, .gp-grid button:active, .zoom-info .price, .dish .thumb, .item-opts.note, .note-chips button.on, .dine-pick button.on, .opt-base, .opt small, .opt-sum b, .pc-img .ph, .pd-track .ph, .opt.on, .gv.on, .dv-pick button.on) { color: var(--sf-accent); }
+[data-store-theme="nuit"] .gv.off { color: #6e7386; }
+[data-store-theme="nuit"] .btn { background: var(--st-panel); color: var(--st-text); border-color: var(--st-line); }
+[data-store-theme="nuit"] .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+[data-store-theme="nuit"] .icon-btn { color: var(--st-text); }
+[data-store-theme="nuit"] .sheet-mask,
+[data-store-theme="nuit"] .opt-overlay { background: rgba(0, 0, 0, 0.6); }
+[data-store-theme="nuit"] .stepper .minus { background: transparent; }
+[data-store-theme="nuit"] .so-tag { background: #23253180; }
+
+/* =====================================================================
+   ⑨ Verre 玻璃：彩色底 + 柔光球、毛玻璃顶栏和卡片、白色细边
+   ===================================================================== */
+[data-store-theme="verre"] body {
+  --st-font: "St Urbanist", var(--st-sys);
+  --st-font-head: var(--st-font);
+  --st-hw: 800;
+  --st-htrack: -0.03em;
+  --st-h2-s: 23px;
+  --st-bg: #eef0f6;
+  --st-panel: rgba(255, 255, 255, 0.78);
+  --st-sheet: #fff;
+  --st-soft: rgba(255, 255, 255, 0.55);
+  --st-field: rgba(255, 255, 255, 0.7);
+  --st-line: rgba(20, 22, 45, 0.13);
+  --st-text: #14151c;
+  --st-muted: #4a4c5a;
+  --st-r-card: 24px;
+  --st-r-img: 18px;
+  --st-img-inset: 6px;
+  --st-r-ctl: 14px;
+  --st-r-sheet: 26px;
+  --st-bd: 1px solid rgba(255, 255, 255, 0.95);
+  --st-sh-card: 0 10px 30px -14px rgba(30, 30, 80, 0.22);
+  --st-sh-card-hover: 0 18px 40px -14px rgba(30, 30, 80, 0.3);
+  --st-lift-y: -3px;
+  --st-hdr-bg: transparent;
+  --st-hdr-fg: var(--st-text);
+  --st-hdr-chip: rgba(255, 255, 255, 0.7);
+  --st-hdr-chip-bd: rgba(255, 255, 255, 0.95);
+  --st-cat-bg: rgba(255, 255, 255, 0.4);
+  --st-cat-on: rgba(255, 255, 255, 0.92);
+  --st-bar-bg: rgba(20, 21, 28, 0.82);
+  --st-bar-sh: 0 14px 34px -10px rgba(30, 30, 80, 0.45);
+  --st-dur: 0.3s;
+}
+/* 柔光球：左上、右边两颗有高光的彩色球 + 淡淡的彩色底 */
+[data-store-theme="verre"] body::before {
+  inset: 0;
+  background:
+    radial-gradient(circle at 38% 34%, rgba(255, 255, 255, 0.95), color-mix(in srgb, var(--g2) 70%, #fff) 14%, var(--g1) 46%, var(--g1d) 66%, transparent 68%) -4vw 36vh / 32vw 32vw no-repeat,
+    radial-gradient(circle at 38% 34%, rgba(255, 255, 255, 0.95), color-mix(in srgb, var(--g3) 70%, #fff) 14%, var(--g3) 46%, var(--g3d) 66%, transparent 68%) 104% 80% / 24vw 24vw no-repeat,
+    radial-gradient(60% 40% at 0% 0%, color-mix(in srgb, var(--g2) 38%, transparent), transparent 70%),
+    radial-gradient(55% 30% at 100% 6%, color-mix(in srgb, var(--g3) 34%, transparent), transparent 70%),
+    radial-gradient(70% 25% at 40% 52%, color-mix(in srgb, var(--g1) 20%, transparent), transparent 70%),
+    radial-gradient(60% 30% at 100% 100%, color-mix(in srgb, var(--g2) 28%, transparent), transparent 70%);
+  animation-duration: 16s;
+}
+/* 顶栏：浮起来的毛玻璃长条 */
+[data-store-theme="verre"] .head::before {
+  content: "";
+  position: absolute;
+  inset: calc(env(safe-area-inset-top, 0px) + 6px) 8px 4px;
+  z-index: -1;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 8px 24px -14px rgba(30, 30, 80, 0.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+}
+[data-store-theme="verre"] .head { padding-left: 22px; }
+[data-store-theme="verre"] .search-bar { background: transparent; border-bottom-color: transparent; }
+[data-store-theme="verre"] .search-bar input { border-color: rgba(255, 255, 255, 0.95); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+[data-store-theme="verre"] .cats { -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+[data-store-theme="verre"] .cats button.on { border-radius: 16px; margin: 2px 6px; width: calc(100% - 12px); }
+[data-store-theme="verre"] .cats button.on::before { left: -6px; }
+[data-store-theme="verre"] .dish .thumb { border: 1px solid rgba(255, 255, 255, 0.95); }
+[data-store-theme="verre"] .cartbar { -webkit-backdrop-filter: blur(18px) saturate(1.5); backdrop-filter: blur(18px) saturate(1.5); border: 1px solid rgba(255, 255, 255, 0.25); }
+[data-store-theme="verre"] .menu { background: none; }
+[data-store-theme="verre"] .banner { margin: 0 12px; border-radius: 20px; overflow: hidden; }
+
+/* =====================================================================
+   ⑩ Affiche 海报：颗粒渐变海报顶栏和分类标题、超宽粗体大字、圆形商品图
+   ===================================================================== */
+[data-store-theme="affiche"] body {
+  --st-font: "St Archivo", var(--st-sys);
+  --st-font-head: var(--st-font);
+  --st-hstretch: 125%;
+  --st-hw: 800;
+  --st-htrack: -0.025em;
+  --st-h2-s: 24px;
+  --st-bg: #f3f3f1;
+  --st-panel: #fff;
+  --st-soft: #e8e8e5;
+  --st-field: #fff;
+  --st-line: #dcdcd8;
+  --st-text: #121316;
+  --st-muted: #595956;
+  --st-r-card: 16px;
+  --st-r-img: 14px;
+  --st-r-ctl: 10px;
+  --st-price: var(--st-text);
+  --st-price-s: 17px;
+  --st-price-stretch: 112%;
+  --st-add-bg: #121316;
+  --st-add-fg: #fff;
+  --st-add-sh: none;
+  --st-hdr-bg: radial-gradient(110% 160% at 0% 0%, var(--g3d), transparent 62%), radial-gradient(90% 180% at 100% 100%, var(--g2d), transparent 62%), var(--g1d);
+  --st-hdr-fg: #fff;
+  --st-hdr-chip: rgba(255, 255, 255, 0.2);
+  --st-bar-bg: #121316;
+  --st-dur: 0.25s;
+}
+/* 颗粒：顶栏和分类标题上一层噪点 */
+[data-store-theme="affiche"] .head::after,
+[data-store-theme="affiche"] .cat-title::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: -1;
+  background-image: var(--st-grain);
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+[data-store-theme="affiche"] .head h1 { font-stretch: 100%; }
+[data-store-theme="affiche"] .head .tno { font-weight: 700; }
+/* 分类标题：一块渐变海报，三种颜色轮着来 */
+[data-store-theme="affiche"] .cat-title { position: relative; isolation: isolate; margin-top: 18px; padding: 18px 16px 16px; border-radius: 16px; overflow: hidden; color: #fff; background: radial-gradient(110% 120% at 0% 0%, var(--g3d), transparent 62%), radial-gradient(90% 120% at 100% 100%, var(--g2d), transparent 62%), var(--g1d); }
+[data-store-theme="affiche"] .cat-sec:nth-of-type(3n + 2) .cat-title { background: radial-gradient(110% 120% at 0% 0%, var(--g1d), transparent 62%), radial-gradient(90% 120% at 100% 100%, var(--g3d), transparent 62%), var(--g2d); }
+[data-store-theme="affiche"] .cat-sec:nth-of-type(3n) .cat-title { background: radial-gradient(110% 120% at 0% 0%, var(--g2d), transparent 62%), radial-gradient(90% 120% at 100% 100%, var(--g1d), transparent 62%), var(--g3d); }
+[data-store-theme="affiche"] .cat-title h2 { line-height: 1.05; overflow-wrap: break-word; }
+[data-store-theme="affiche"] .cat-title .cat-sub { color: rgba(255, 255, 255, 0.9); }
+/* 商品图外一圈主色描边 */
+[data-store-theme="affiche"] .dish .thumb { box-shadow: 0 0 0 3px var(--p-tint); }
+[data-store-theme="affiche"] .pc-name { font-weight: 600; }
+[data-store-theme="affiche"] .pc-tags .hot-badge,
+[data-store-theme="affiche"] .new-badge { background: #121316; color: #fff; }
+[data-store-theme="affiche"] .cats button.on { font-weight: 800; font-stretch: 112%; }
+[data-store-theme="affiche"] .cartbar .go { font-weight: 800; }
+[data-store-theme="affiche"] .shop-grid .cat-title { margin-top: 6px; }

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gway POS — Démo</title>
+<style>body{font:16px system-ui,sans-serif;color:#444;padding:40px;text-align:center}</style>
+</head>
+<body>
+<p>Chargement de la démo… / 正在打开演示…</p>
+<script>
+// GitHub Pages 找不到的网址：
+// - 演示里的页面（.../s/<店>/order.html?t=…，比如手机扫了演示桌贴上的二维码）：先装好演示的 Service Worker，再重新打开同一个网址
+// - 别的：回演示首页
+(function () {
+  var p = location.pathname;
+  var i = p.indexOf("/s/");
+  var base = i >= 0 ? p.slice(0, i + 1) : "/" + (p.split("/")[1] || "") + "/";
+  if (base === "//") base = "/";
+  if (i < 0 || !("serviceWorker" in navigator) || sessionStorage.getItem("demo_404_once")) { sessionStorage.removeItem("demo_404_once"); location.replace(base); return; }
+  sessionStorage.setItem("demo_404_once", "1");
+  navigator.serviceWorker.register(base + "sw.js", { scope: base }).then(function () { return navigator.serviceWorker.ready; })
+    .then(function () { setTimeout(function () { location.reload(); }, 300); })
+    .catch(function () { location.replace(base); });
+})();
+</script>
+</body>
+</html>

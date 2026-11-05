@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><script src="../../demo/inject.js"></script>
+<meta charset="utf-8">
+<script src="compat.js"></script>
+<script src="theme.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111">
+<title>厨房显示屏</title>
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest-kitchen.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="厨房屏">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  /* 厨房显示屏：深色底、大字，离远也看得清；按等的时间变色（绿 → 橙 → 红） */
+  html, body { background: #15130f; color: #f4f1ea; }
+  #login { max-width: 360px; margin: 60px auto; background: #fff; color: var(--text); border-radius: 16px; padding: 24px; }
+  .kbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 14px; background: #1f1c17; border-bottom: 1px solid #333; }
+  .kbar h1 { font-size: 18px; margin: 0; }
+  .kbar select, .kbar button { font-size: 15px; }
+  .kbar select { background: #2d2922; color: #f4f1ea; border: 1px solid #47413a; border-radius: 10px; padding: 7px 10px; }
+  .kbar .stat { color: #c9c2b5; font-size: 14px; }
+  .kbar .sp { flex: 1; }
+  .kbar .clock { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kbtn { background: #2d2922; color: #f4f1ea; border: 1px solid #47413a; border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+  /* 触屏（后厨平板）：顶栏按钮、语言按钮至少 44px 好点（B22） */
+  html.touch #setBtn, html.touch #fsBtn, html.touch #langSlot .i18n-switch { min-width: 44px; min-height: 44px; }
+  @media (any-pointer: coarse) { #setBtn, #fsBtn, #langSlot .i18n-switch { min-width: 44px; min-height: 44px; } }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding: 14px; align-items: start; }
+  .tk { background: #24211b; border-radius: 14px; overflow: hidden; border: 2px solid #2f2b24; display: flex; flex-direction: column; }
+  .tk .hd { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; background: #1d6b3a; }
+  .tk.warn .hd { background: #b45309; }
+  .tk.late .hd { background: #b91c1c; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { filter: brightness(1.25); } }
+  .tk .hd b { font-size: 26px; }
+  .tk .hd .t { margin-left: auto; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tk .meta { padding: 6px 12px 0; font-size: 14px; color: #d6cfc2; display: flex; gap: 8px; flex-wrap: wrap; }
+  .tk .meta .rush { background: #dc2626; color: #fff; border-radius: 99px; padding: 0 8px; font-weight: 700; }
+  .tk .onote { margin: 6px 12px 0; padding: 4px 8px; border-radius: 8px; background: #fde047; color: #111; font-weight: 700; }
+  .tk ul { list-style: none; margin: 8px 0; padding: 0; }
+  .tk li { display: flex; gap: 10px; padding: 8px 12px; font-size: 20px; cursor: pointer; border-top: 1px solid #312d26; user-select: none; }
+  .tk li .q { font-weight: 800; min-width: 34px; color: #fbbf24; }
+  .tk li .nm { flex: 1; }
+  .tk li .op { display: block; font-size: 15px; color: #c9c2b5; }
+  .tk li .nt { display: block; font-size: 15px; font-weight: 700; color: #111; background: #fde047; border-radius: 6px; padding: 0 6px; margin-top: 2px; width: fit-content; }
+  .tk li.done { opacity: .45; } .tk li.done .nm { text-decoration: line-through; }
+  .tk li.done .q::after { content: " ✓"; color: #4ade80; }
+  .tk li.cx { opacity: .8; } .tk li.cx .nm { text-decoration: line-through; color: #f87171; }
+  .tk li.cx .q { color: #f87171; }
+  .tk li.new { animation: flash 1.2s ease 3; }
+  @keyframes flash { 50% { background: #3f3a12; } }
+  .tk .bump { display: flex; align-items: center; justify-content: center; gap: 8px; margin: auto 10px 10px; padding: 14px; font-size: 20px; font-weight: 800; border: 0; border-radius: 12px; background: #16a34a; color: #fff; cursor: pointer; }
+  .empty { grid-column: 1 / -1; display: grid; place-items: center; align-content: center; gap: 10px; min-height: 60vh; text-align: center; color: #8a8378; font-size: 22px; }
+  .empty::before { content: ""; width: 84px; height: 84px; border-radius: 50%; border: 2px dashed #3a352c; animation: kspin 18s linear infinite; }
+  @keyframes kspin { to { transform: rotate(360deg); } }
+  .doneBar:empty { display: none; }
+  .doneBar { display: flex; gap: 8px; overflow-x: auto; padding: 8px 14px 18px; border-top: 1px solid #333; }
+  .doneBar .d { flex: none; background: #24211b; border-radius: 10px; padding: 8px 12px; font-size: 15px; color: #c9c2b5; }
+  .doneBar .d button { margin-left: 8px; }
+  .sound { background: #fde047; color: #111; text-align: center; padding: 10px; font-weight: 700; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="login" class="hidden"><h2 style="margin-top:0">🍳 厨房显示屏</h2><p class="muted">员工 PIN 登录</p><div id="pad"></div></div>
+<div id="app" class="hidden">
+  <div class="sound" id="soundTip">🔔 点一下这里开启新单提示音</div>
+  <div class="kbar">
+    <h1>🍳</h1>
+    <select id="station"></select>
+    <span class="stat" id="stat"></span>
+    <span class="sp"></span>
+    <span id="langSlot"></span>
+    <button class="kbtn" id="setBtn" title="设置">⚙</button>
+    <button class="kbtn" id="fsBtn" title="全屏">⛶</button>
+    <span class="clock" id="clock"></span>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="doneBar" id="doneBar"></div>
+</div>
+<script src="i18n.js"></script>
+<script src="common.js"></script>
+<script>
+const K = { station: store.get("kds_station") || "0", warn: store.get("kds_warn") || 10, late: store.get("kds_late") || 20, data: null, seen: new Set(), firstLoad: true };
+let audio = null;
+// 这台设备一键静音了（收银台顶栏 🔕，同一个浏览器里的 voice_local = off）：厨房屏也不响，新单照样闪
+function beep() {
+  if (!audio || store.get("voice_local") === "off") return;
+  try {
+    [880, 1175].forEach((f, i) => {
+      const o = audio.createOscillator(), g = audio.createGain(), t0 = audio.currentTime + i * 0.18;
+      o.frequency.value = f; o.connect(g); g.connect(audio.destination);
+      g.gain.setValueAtTime(0.3, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.3); o.start(t0); o.stop(t0 + 0.32);
+    });
+  } catch {}
+}
+$("#soundTip").onclick = () => {
+  try { audio = new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); beep(); } catch {}
+  $("#soundTip").classList.add("hidden");
+};
+
+const mins = (since) => (Date.now() - new Date(String(since).replace(" ", "T"))) / 60000;
+const mmss = (m) => { const s = Math.max(0, Math.floor(m * 60)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+
+async function load() {
+  const d = await api(`/api/kds?printer=${encodeURIComponent(K.station)}`);
+  // 新单 / 新加的菜：响一下、闪一下
+  let fresh = false;
+  for (const tk of d.open) for (const i of tk.items) {
+    if (!K.seen.has(i.id)) { if (!K.firstLoad) { fresh = true; i.isNew = true; } K.seen.add(i.id); }
+  }
+  if (fresh) beep();
+  K.firstLoad = false;
+  K.data = d;
+  render();
+}
+function render() {
+  const d = K.data;
+  if (!d) return;
+  $("#stat").textContent = `待做 ${d.open.length} 单 · 今天已出 ${d.stats.done_today} 道${d.stats.avg_minutes != null ? ` · 平均 ${d.stats.avg_minutes} 分钟` : ""}`;
+  $("#grid").innerHTML = d.open.map((tk) => {
+    const m = mins(tk.since);
+    const cls = m >= K.late ? "late" : m >= K.warn ? "warn" : "";
+    // 标题带 translate="no"（桌名本身不翻），所以这里先按「{0} 桌 / 外带 {0}」翻好（以前法语后厨屏显示「2 桌」）
+    const title = I18N.t(tk.order_type === "takeaway" ? `外带 ${tk.label}` : `${tk.label} 桌`);
+    return `<div class="tk ${cls}" data-o="${tk.order_id}">
+      <div class="hd"><b translate="no">${esc(title)}</b><span class="t" translate="no" data-since="${esc(tk.since)}">${mmss(m)}</span></div>
+      <div class="meta">${tk.guests ? `<span>👥 ${tk.guests} 位</span>` : ""}${tk.platform ? `<span>🛵 ${esc(tk.platform)}</span>` : ""}${tk.dine_option === "togo" ? "<span>🥡 打包</span>" : tk.dine_option === "here" ? "<span>🍽 堂食</span>" : ""}
+        ${tk.pickup_time ? `<span>⏰ ${esc(String(tk.pickup_time).slice(11, 16) || tk.pickup_time)}</span>` : ""}${tk.rush ? `<span class="rush">催 ${tk.rush} 次</span>` : ""}</div>
+      ${tk.note ? `<div class="onote">${esc(tk.note)}</div>` : ""}
+      <ul>${tk.items.map((i) => `<li class="${i.cancelled ? "cx" : i.done_at ? "done" : ""} ${i.isNew ? "new" : ""}" data-i="${i.id}" data-done="${i.done_at ? 1 : 0}">
+        <span class="q">${i.qty}×</span><span class="nm">${esc(i.name)}${i.cancelled ? " （已退）" : ""}${i.options_text ? `<span class="op">${esc(i.options_text)}</span>` : ""}${i.note ? `<span class="nt">${esc(i.note)}</span>` : ""}</span></li>`).join("")}</ul>
+      <button class="bump" data-bump="${tk.order_id}"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5 10-11"/></svg><span>出餐</span></button></div>`;
+  }).join("") || `<div class="empty">👌 没有要做的单</div>`;
+  $("#doneBar").innerHTML = d.done.length ? `<span class="stat" style="align-self:center">刚出餐：</span>` + d.done.map((tk) =>
+    `<span class="d">${esc(tk.order_type === "takeaway" ? `外带 ${tk.label}` : `${tk.label} 桌`)} · ${esc(String(tk.done_at).slice(11, 16))}<button class="kbtn" data-recall="${tk.order_id}">↩ 撤回</button></span>`).join("") : "";
+  // 每秒的计时只改这些数字（v1.25.1：以前每秒都在整页里找一遍、每张单都重设样式）
+  K.timers = [...$("#grid").querySelectorAll("[data-since]")].map((el) => {
+    const m = mins(el.dataset.since);
+    return { el, tk: el.closest(".tk"), since: el.dataset.since, cls: m >= K.late ? "late" : m >= K.warn ? "warn" : "" };
+  });
+}
+// 每秒一次：只改计时数字（文字节点直接改，不重建），颜色变了才改样式；屏幕关着 / 切到后台时不动
+function tick() {
+  if (document.hidden) return;
+  const n = new Date();
+  const clock = `${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`;
+  const ce = $("#clock");
+  if (ce.textContent !== clock) ce.textContent = clock;
+  for (const x of K.timers || []) {
+    const m = mins(x.since);
+    const txt = mmss(m);
+    const node = x.el.firstChild;
+    if (node && node.nodeType === 3) { if (node.nodeValue !== txt) node.nodeValue = txt; }
+    else x.el.textContent = txt;
+    const cls = m >= K.late ? "late" : m >= K.warn ? "warn" : "";
+    if (cls !== x.cls) {
+      x.tk.classList.toggle("late", cls === "late");
+      x.tk.classList.toggle("warn", cls === "warn");
+      x.cls = cls;
+    }
+  }
+}
+
+$("#grid").addEventListener("click", async (e) => {
+  try {
+    const li = e.target.closest("li[data-i]");
+    if (li && !li.classList.contains("cx")) {
+      li.classList.toggle("done");
+      await api(`/api/kds/items/${li.dataset.i}`, { method: "POST", body: { done: li.dataset.done !== "1" } });
+      return load();
+    }
+    const b = e.target.closest("[data-bump]");
+    if (b) {
+      b.disabled = true;
+      await api(`/api/kds/orders/${b.dataset.bump}/bump`, { method: "POST", body: { printer: Number(K.station) } });
+      return load();
+    }
+  } catch (err) { toast(err.message, "error"); load().catch(() => {}); }
+});
+$("#doneBar").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-recall]");
+  if (!b) return;
+  try { await api(`/api/kds/orders/${b.dataset.recall}/recall`, { method: "POST", body: { printer: Number(K.station) } }); load(); }
+  catch (err) { toast(err.message, "error"); }
+});
+$("#station").onchange = (e) => { K.station = e.target.value; store.set("kds_station", K.station); K.firstLoad = true; K.seen.clear(); load().catch((err) => toast(err.message, "error")); };
+// 全屏：Fullscreen API（含 webkit 前缀）；iPhone 不支持网页全屏 → 提示「添加到主屏幕」（common.js 的 PosFullscreen）
+$("#fsBtn").onclick = () => PosFullscreen.toggle();
+PosFullscreen.onChange((on) => { $("#fsBtn").title = on ? "退出全屏" : "全屏"; });
+if (navigator.standalone === true) $("#fsBtn").hidden = true; // 已经从主屏幕图标打开（整屏）
+$("#setBtn").onclick = async () => {
+  const st = await api("/api/kds/dish-stats").catch(() => []);
+  const m = openModal({
+    title: "厨房显示屏设置",
+    body: `<div class="form-grid"><label class="field"><span>超过几分钟变橙色</span><input type="number" id="kWarn" min="1" max="120" value="${K.warn}"></label>
+      <label class="field"><span>超过几分钟变红色</span><input type="number" id="kLate" min="1" max="180" value="${K.late}"></label></div>
+      <h4 style="margin:14px 0 6px">最近 30 天出餐最慢的菜（堂食，从下单到做好）</h4>
+      ${st.length ? `<table class="list"><tbody>${st.slice(0, 15).map((x) => `<tr><td>${esc(x.name)}</td><td class="r num">${x.avg_minutes} 分钟</td><td class="r muted">${x.n} 次</td></tr>`).join("")}</tbody></table>` : `<p class="muted">还没有数据：在显示屏上点「出餐」后开始统计。</p>`}
+      <p style="margin-top:14px"><button class="btn" id="kLogout">退出登录</button></p>`,
+    buttons: [{ label: "取消" }, { label: "保存", kind: "primary", onClick: () => {
+      K.warn = Math.max(1, Number($("#kWarn").value) || 10); K.late = Math.max(K.warn + 1, Number($("#kLate").value) || 20);
+      store.set("kds_warn", K.warn); store.set("kds_late", K.late); render();
+    } }],
+  });
+  $("#kLogout", m.el).onclick = () => { store.set("pos_token", null); location.reload(); };
+};
+
+let reloadTimer = null;
+function start() {
+  $("#login").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  api("/api/kds/stations").then((list) => {
+    $("#station").innerHTML = `<option value="0">全部出餐</option>` + list.map((p) => `<option value="${p.id}" ${String(p.id) === String(K.station) ? "selected" : ""}>${esc(p.name)}</option>`).join("");
+    if (!list.some((p) => String(p.id) === String(K.station))) K.station = "0";
+    $("#station").value = K.station;
+    load().catch((e) => toast(e.message, "error"));
+  });
+  connectLive((msg) => {
+    if (["kds", "orders", "reconnected", "print"].includes(msg.type)) scheduleLoad();
+    // 限量的菜快卖完 / 卖完了：厨房也提醒一下（不挡操作）
+    if (msg.type === "stock_low") for (const it of msg.items || []) toast(it.left ? `「${it.name}」只剩 ${it.left} 份` : `「${it.name}」已售罄`, "warn");
+  });
+  setInterval(tick, 1000);
+  // 厨房屏被挡住 / 最小化 / 平板灭屏时也要照常拉新单、响铃（只有每秒的计时数字暂停）
+  setInterval(() => { load().catch(() => {}); }, 30000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    tick();
+    if (K.stale) scheduleLoad();
+  });
+  tick();
+}
+// 收到消息后等 300 毫秒再刷新（几条消息合成一次），但最多等 1 秒：高峰时消息一直来也要刷新
+let reloadFirstAt = 0;
+function scheduleLoad() {
+  K.stale = true;
+  const now = Date.now();
+  if (!reloadFirstAt) reloadFirstAt = now;
+  clearTimeout(reloadTimer);
+  reloadTimer = setTimeout(() => {
+    reloadFirstAt = 0;
+    K.stale = false; // 看不见时也刷新：新单要响铃
+    load().catch(() => {});
+  }, Math.max(0, Math.min(300, reloadFirstAt + 1000 - now)));
+}
+I18N.init({ subset: true }).then(() => {
+  I18N.mountSwitcher($("#langSlot"), { dark: true }); // 深色顶栏用深色的语言按钮
+  if (store.get("pos_token")) return api("/api/kds/stations").then(start).catch(() => showLogin());
+  showLogin();
+});
+function showLogin() {
+  $("#login").classList.remove("hidden");
+  mountPinLogin($("#pad"), () => start());
+}
+</script>
+</body>
+</html>

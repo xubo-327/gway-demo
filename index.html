@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gway POS — Démo interactive</title>
+<link rel="icon" href="demo/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="demo/demo.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <img src="demo/logo.svg" alt="" width="32" height="32">
+    <div><b>Gway POS</b><span data-t="tagline"></span></div>
+  </div>
+  <div class="store-chip" id="storeChip"></div>
+  <div class="top-right">
+    <button class="btn ghost" id="resetBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span data-t="reset"></span></button>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="panel" id="panel">
+    <section class="group">
+      <h2 data-t="g_lang"></h2>
+      <div class="seg" id="uiLang" role="group" aria-label="语言 / Langue"><button data-v="zh">中文</button><button data-v="fr">Français</button></div>
+      <p class="hint" data-t="lang_hint"></p>
+    </section>
+
+    <section class="group">
+      <h2 data-t="g_store"></h2>
+      <div class="store-list" id="storeList"></div>
+    </section>
+
+    <section class="group">
+      <h2 data-t="g_look"></h2>
+      <p class="hint" data-t="look_hint"></p>
+      <div class="themes" id="themes"></div>
+      <div class="row">
+        <span class="lbl" data-t="layout"></span>
+        <div class="seg" id="shopStyle"><button data-v="menu" data-t="l_menu"></button><button data-v="shop" data-t="l_shop"></button></div>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2 data-t="g_customer"></h2>
+      <div class="row col">
+        <span class="lbl" data-t="c_device"></span>
+        <div class="seg" id="custDevice"><button data-v="phone" data-t="d_phone"></button><button data-v="tablet" data-t="d_tablet"></button><button data-v="desktop" data-t="d_desktop"></button></div>
+      </div>
+      <div class="row col">
+        <span class="lbl" data-t="c_entry"></span>
+        <select id="custEntry"></select>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2 data-t="g_staff"></h2>
+      <div class="row col">
+        <span class="lbl" data-t="s_screens"></span>
+        <div class="seg" id="screens"><button data-v="both" data-t="sc_both"></button><button data-v="pos" data-t="sc_pos"></button><button data-v="kds" data-t="sc_kds"></button></div>
+      </div>
+    </section>
+
+    <section class="group" id="scGroup" hidden>
+      <h2 data-t="g_situation"></h2>
+      <div class="scen" id="scenarios"></div>
+    </section>
+
+    <section class="group" id="autoGroup" hidden>
+      <h2 data-t="g_auto"></h2>
+      <p class="hint" data-t="auto_hint"></p>
+      <button class="btn primary wide" id="autoBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z"/></svg><span data-t="auto_go"></span></button>
+    </section>
+
+    <p class="foot" data-t="foot"></p>
+  </aside>
+
+  <section class="stage" id="stage">
+    <div class="caption" id="caption" hidden>
+      <div class="cap-step" id="capStep"></div>
+      <div class="cap-text" id="capText"></div>
+      <button class="cap-stop" id="capStop" data-t="stop"></button>
+    </div>
+    <div class="devices" id="devices">
+      <figure class="dev dev-cust" id="devCust">
+        <figcaption><span class="dot c1"></span><b data-t="f_cust"></b><span class="sub" id="custSub"></span></figcaption>
+        <div class="bezel phone" id="custBezel"><div class="screen"><iframe name="demo-cust" id="fCust" title="client"></iframe></div></div>
+      </figure>
+      <figure class="dev dev-pos" id="devPos">
+        <figcaption><span class="dot c2"></span><b data-t="f_pos"></b><span class="sub" data-t="f_pos_sub"></span></figcaption>
+        <div class="bezel tablet"><div class="screen"><iframe name="demo-pos" id="fPos" title="caisse"></iframe></div></div>
+      </figure>
+      <figure class="dev dev-kds" id="devKds">
+        <figcaption><span class="dot c3"></span><b data-t="f_kds"></b><span class="sub" data-t="f_kds_sub"></span></figcaption>
+        <div class="bezel monitor"><div class="screen"><iframe name="demo-kds" id="fKds" title="cuisine"></iframe></div></div>
+      </figure>
+    </div>
+    <div class="busy" id="busy" hidden><div class="spin"></div><span data-t="loading"></span></div>
+  </section>
+</main>
+<script src="demo/demo.js"></script>
+<script src="demo/demo-extra.js"></script>
+</body>
+</html>

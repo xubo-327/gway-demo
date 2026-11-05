@@ -1,0 +1,563 @@
+:root {
+  --bg: #f4f2ee;
+  --panel: #ffffff;
+  --line: #e4e0d8;
+  --text: #1f1d1a;
+  --muted: #6f695f; /* v1.24：原 #7a746a 在米色底上对比度不够 4.5:1 */
+  --accent: #c2410c;
+  --accent-soft: #fdeee6;
+  --accent-dark: #9a3412;
+  --idle: #ffffff;
+  --occupied: #fff4d6;
+  --occupied-line: #e0a800;
+  --billing: #fde4e1;
+  --billing-line: #d93025;
+  --ok: #1e8e3e;
+  --danger: #d93025;
+  --radius: 10px;
+  color-scheme: light;
+  /* ---------- v1.24 设计规范（新写的样式都用这些，不要再随手写新数值） ----------
+     间距：4 / 8 / 12 / 16 / 24 / 32    圆角：8（输入框、小按钮）/ 10（按钮）/ 14（卡片）/ 18（弹窗）
+     字号：12 说明小字 / 13 次要 / 14 正文 / 16 强调 / 20 标题      颜色：只有一个主色（--accent，店里可改），
+     语义色：绿 --ok 成功、琥珀 --warn 提醒 / 爆款、红 --danger 错误 / 删除；不要用渐变色块和表情符号当图标
+     主题色上的文字用 --on-accent，主题色当文字用 --accent-text（theme.js 按亮度算，浅色主题也看得清） */
+  --radius-lg: 14px;
+  --line-soft: #eeece8;
+  --surface-2: #f6f5f2;
+  --warn: #b45309; --warn-text: #92400e; --warn-soft: #fdf3e1;
+  --on-accent: #fff;
+  --accent-text: var(--accent);
+  --go-bg: var(--accent); --go-fg: var(--on-accent);
+  --focus-ring: #8fb8a6; /* 老浏览器（Win7 的 Chrome 109、iOS 16.2 以前）不认 color-mix，用这个固定色 */
+}
+@supports (color: color-mix(in srgb, red 50%, white)) { :root { --focus-ring: color-mix(in srgb, var(--accent) 45%, #fff); } }
+/* 带 hidden 属性的元素一律不显示（以前 .bulk-bar 等写了 display:flex，hidden 失效，菜单页多出一条空黑条） */
+[hidden] { display: none !important; }
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  background-image: var(--pattern, none); /* 系统花纹（theme.js 按店里选的颜色生成） */
+  color: var(--text);
+  font: 14px/1.5 -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3 { margin: 0; }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+.hidden { display: none !important; }
+
+.btn {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover { border-color: #c9c3b8; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.danger { color: var(--danger); border-color: #f1c0bb; }
+.btn.small { padding: 3px 9px; font-size: 13px; }
+.btn.big { padding: 12px 20px; font-size: 16px; }
+.icon-btn { border: 0; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: var(--muted); padding: 4px 8px; }
+.og-row [data-mvc] { font-size: 15px; padding: 4px 5px; }
+.icon-btn:disabled { opacity: .25; cursor: default; }
+
+input[type=text], input[type=number], input[type=password], input[type=date], input[type=month], input[type=search], input[type=tel], input[type=time], input[type=email], textarea, select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #fff;
+  min-width: 0;
+}
+input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+
+/* 流畅模式（老电脑）：不要动画、阴影、模糊和背景花纹，滚动和点按更跟手 */
+.lite *, .lite *::before, .lite *::after { transition: none !important; animation-duration: 0s !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; box-shadow: none !important; text-shadow: none !important; backdrop-filter: none !important; filter: none !important; }
+.lite body, .lite .topbar { background-image: none !important; }
+.happy { color: #db2777; font-weight: 800; }
+.happy-tag { display: inline-block; padding: 0 6px; border-radius: 99px; font-size: 11px; font-weight: 700; color: #fff; background: #db2777; vertical-align: 1px; }
+/* 爆款小标：安静的琥珀色小标签（v1.24 以前是红橙渐变 + 粉色底 + 左边橙条，太吵） */
+.hot-badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; margin-right: 5px; border-radius: 6px; font-size: 12px; font-weight: 700; line-height: 1.5; color: var(--warn-text); background: var(--warn-soft); vertical-align: 1px; white-space: nowrap; }
+/* 爆款卡片：收银台加菜弹窗里边框带一点琥珀色（顾客点餐页只靠小标，不用这条） */
+.pk-item.is-hot { border-color: #ecd3a5; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; background: #efede9; color: #5f5a52; white-space: nowrap; }
+.badge.ok { background: #e3f3e7; color: var(--ok); }
+.badge.warn { background: #fff4d6; color: #8a6400; }
+.badge.err { background: #fde4e1; color: var(--danger); }
+.badge.accent { background: var(--accent-soft); color: var(--accent); }
+
+/* ---------- 弹窗 / 提示 ---------- */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(30, 25, 20, .45);
+  display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px;
+}
+.modal {
+  background: var(--panel); border-radius: 14px; width: min(440px, 100%);
+  max-height: calc(100vh - 32px); max-height: calc(var(--app-vh, 100vh) - 32px); display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+/* 手机浏览器的 100vh 含地址栏，弹窗底部的按钮会被挡住：用看得见的高度（dvh，老浏览器用 common.js 算的 --app-vh） */
+@supports (height: 100dvh) { .modal, .opt-panel { max-height: calc(100dvh - 32px); } }
+.modal.wide { width: min(920px, 100%); }
+/* 页面美化（10-11）：手机上大弹窗（点菜、订单详情等）铺满整屏，内容不再挤在一个小框里 */
+@media (max-width: 600px) {
+  .modal-overlay.full { padding: 0; }
+  .modal.wide { width: 100%; height: 100%; max-height: none; border-radius: 0; }
+  @supports (height: 100dvh) { .modal.wide { height: 100dvh; } }
+}
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.modal-head h3 { font-size: 17px; }
+.modal-body { padding: 16px 18px; overflow: auto; }
+.modal-body p { margin: 0 0 8px; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--line); }
+
+#toasts { position: fixed; top: 64px; left: 16px; right: auto; transform: none; z-index: 100; display: grid; gap: 8px; justify-items: start; width: max-content; max-width: calc(100vw - 32px); pointer-events: none; } /* 提示条放左上角、顶栏下方：不挡也不挤导航栏（点得穿） */
+.toast { background: #2b2824; color: #fff; padding: 10px 18px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
+.toast.error { background: var(--danger); }
+.toast.success { background: var(--ok); }
+.toast.warn { background: var(--warn); } /* 提醒（如限量的菜快卖完了） */
+
+.field { display: grid; gap: 4px; margin-bottom: 12px; }
+.field > span { font-size: 13px; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+/* 页面美化（10-11）：没有按钮的切换框不显示（以前留下一个空的小框 / 圆点） */
+.seg:empty { display: none; }
+.seg button { border: 0; background: #fff; padding: 7px 14px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent); color: #fff; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---------- 小票预览 ---------- */
+.ticket {
+  --cols: 32;
+  font-family: "NSimSun", "SimSun", "Courier New", monospace;
+  font-size: 13px; line-height: 1.45;
+  width: calc(var(--cols) * 1ch + 24px);
+  max-width: 100%;
+  background: #fffdf7; color: #111;
+  padding: 12px; border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  white-space: pre; overflow: hidden;
+}
+.ticket .tl.big { font-size: 26px; line-height: 1.3; }
+.ticket .tl.huge { font-size: 39px; line-height: 1.25; }
+.ticket .tl.tall { line-height: 2.9; }
+.ticket .tl.tall span { display: inline-block; transform: scaleY(2); transform-origin: center; }
+.ticket .tl span.inv { background: #111; color: #fffdf7; }
+.ticket .tl.bold { font-weight: 400; -webkit-text-stroke: .45px currentColor; } /* 描边加粗：字宽不变，和小票机一样每行字数准确 */
+.ticket .a-center { text-align: center; }
+.ticket .a-right { text-align: right; }
+.ticket img.tqr, .ticket img.timg { display: inline-block; image-rendering: pixelated; vertical-align: top; }
+
+/* ---------- PIN 登录 ---------- */
+.login-screen { min-height: 100%; display: grid; place-items: center; padding: 16px; }
+.login-card { background: var(--panel); padding: 28px; border-radius: 16px; width: min(340px, 100%); box-shadow: 0 10px 40px rgba(0,0,0,.08); text-align: center; }
+.login-card h1 { font-size: 20px; margin-bottom: 4px; }
+.pin-dots { display: flex; justify-content: center; gap: 12px; margin: 20px 0; height: 16px; }
+.pin-dots i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #c9c3b8; }
+.pin-dots i.on { background: var(--accent); border-color: var(--accent); }
+.pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pin-pad button { padding: 14px 0; font-size: 20px; border-radius: 10px; border: 1px solid var(--line); background: #faf9f7; cursor: pointer; }
+.pin-pad button:active { background: var(--accent-soft); }
+/* 登录：先选员工（头像 + 姓名），再输 PIN */
+.staff-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 46vh; overflow: auto; }
+.staff-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px; border-radius: 12px; border: 1px solid var(--line); background: #faf9f7; cursor: pointer; }
+.staff-btn:active { background: var(--accent-soft); }
+.staff-btn .av { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: var(--on-accent, #fff); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; }
+.staff-btn .nm { font-size: 15px; font-weight: 600; }
+.staff-btn .rl { font-size: 12px; }
+.touch .staff-btn { padding: 16px 8px; }
+.touch .staff-btn .av { width: 52px; height: 52px; font-size: 24px; }
+
+/* ---------- 菜品图片 / 规格加料面板 ---------- */
+img.thumb, .thumb.ph { object-fit: cover; background: var(--accent-soft); }
+.ph { display: grid; place-items: center; color: var(--accent); font-weight: 700; }
+.opt-overlay { position: fixed; inset: 0; background: rgba(30, 25, 20, .5); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.opt-panel { position: relative; background: #fff; border-radius: 16px; width: min(460px, 100%); max-height: calc(100vh - 32px); max-height: calc(var(--app-vh, 100vh) - 32px); display: flex; flex-direction: column; overflow: hidden; }
+.opt-close { position: absolute; top: 8px; right: 8px; z-index: 1; }
+.opt-head { display: flex; gap: 14px; align-items: center; padding: 18px 18px 10px; }
+.opt-img { width: 84px; height: 84px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: var(--accent-soft); font-size: 30px; }
+.opt-name { font-size: 18px; font-weight: 700; }
+.opt-base { color: var(--accent); }
+.opt-body { overflow-y: auto; padding: 0 18px 8px; }
+.opt-group { padding: 10px 0; }
+.opt-title { font-weight: 600; margin-bottom: 8px; }
+.opt-title span { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 4px; }
+.opt-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt { border: 1px solid var(--line); background: #faf9f7; border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 14px; }
+.opt small { color: var(--accent); }
+.opt.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.opt-foot { display: flex; align-items: center; gap: 12px; padding: 12px 18px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); }
+.opt-sum { flex: 1; min-width: 0; }
+.opt-sum b { font-size: 20px; color: var(--accent); }
+.opt-sum .muted { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.opt-qty { display: inline-flex; align-items: center; gap: 8px; }
+.opt-qty button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 16px; line-height: 1; }
+.opt-foot .btn { padding: 9px 22px; }
+.item-opts { font-size: 12px; color: var(--muted); }
+/* 规格面板里的备注（收银端）：和「+ 备注」同一套预设，选完规格可直接写，一步加入 */
+.opt-note { border-top: 1px dashed var(--line); margin-top: 2px; }
+.opt-noteinput { width: 100%; margin-top: 8px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+.opt-noteinput:focus { outline: none; border-color: var(--accent); }
+@media (max-width: 600px) {
+  .opt-overlay { align-items: flex-end; padding: 0; }
+  .opt-panel { border-radius: 16px 16px 0 0; width: 100%; max-height: 85vh; }
+}
+
+/* 分类标签：颜色由 --cc（文字/圆点）和 --cb（底色）决定 */
+.ctag { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; color: var(--cc); background: var(--cb); white-space: nowrap; vertical-align: 1px; }
+.ctag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--cc); }
+
+/* ---------- 语言切换 ---------- */
+/* 双语（中文 + 外语）：译文默认在中文下面一行；字号不小于 11px，否则小字的译文看不清 */
+.i18n-2 { display: block; font-size: max(.8em, 11px); font-weight: 400; opacity: .75; line-height: 1.2; letter-spacing: 0; }
+/* 双语：横排框里中文 + 译文包成一块（i18n.js），整块一起换行，不把中文挤成一字一行 */
+.i18n-pair { display: inline-block; min-width: 0; }
+/* 长句（说明文字）：译文单独一段，稍大一点更好读 */
+.i18n-2.i18n-long { font-size: max(.92em, 11px); margin-top: 2px; }
+/* 一句话被加粗词切成几段时，整句译文放在段落末尾（<br> 换行保留） */
+.i18n-2.i18n-para { display: block; font-size: max(.92em, 11px); margin-top: 3px; white-space: pre-line; }
+/* 窄的地方（标签、角标、表头、提示条、单字）：译文跟在中文后面同一行，不把按钮撑成两三行 */
+.i18n-2.i18n-in, .badge .i18n-2, .nav-badge .i18n-2, th .i18n-2, .toast .i18n-2, .chips .i18n-2, .seg.mini .i18n-2 { display: inline; margin-left: .35em; }
+/* 双语时按钮、标签文字不折行（以前「菜单」会被挤成竖排） */
+.i18n-dual .nav button, .i18n-dual .seg button, .i18n-dual .btn, .i18n-dual .badge { white-space: nowrap; line-height: 1.15; }
+.i18n-switch { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: #fff; border-radius: 99px; padding: 5px 12px; cursor: pointer; font-size: 13px; white-space: nowrap; color: var(--text); }
+.i18n-switch .i18n-globe { flex: none; opacity: .7; }
+.i18n-switch.dark { background: transparent; color: #fff; border-color: #57524b; }
+.i18n-switch-pop { position: fixed; z-index: 300; background: #fff; border-radius: 14px; box-shadow: 0 12px 36px rgba(0,0,0,.22); padding: 12px; width: 260px; display: grid; gap: 10px; }
+.i18n-langs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.i18n-modes { display: grid; gap: 6px; }
+/* 语言弹窗里的「中文对照」勾选（类名不能叫 i18n-dual：那是双语模式加在整个页面上的标记，会把所有输入框压成 18px） */
+.i18n-dual-opt { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; cursor: pointer; }
+.i18n-dual-opt input { width: 18px; height: 18px; }
+.i18n-switch-pop button { border: 1px solid var(--line); background: #faf9f7; border-radius: 10px; padding: 10px 8px; cursor: pointer; font-size: 15px; min-height: 44px; color: var(--text); }
+.i18n-switch-pop button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.i18n-switch-pop .i18n-ok { background: #2b2824; color: #fff; border-color: #2b2824; }
+
+/* ---------- 触摸屏 ---------- */
+/* 所有设备：去掉双击缩放和长按菜单，按钮文字不会被误选 */
+html { touch-action: manipulation; }
+button, .btn, .tcard, .ftable, .to-card, .pk-item, [role=button] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* 触摸模式：点击目标至少 44px */
+.touch .btn { min-height: 44px; padding: 10px 16px; font-size: 15px; }
+.touch .btn.small { min-height: 40px; padding: 7px 12px; font-size: 14px; }
+.touch .seg button { min-height: 42px; padding: 8px 16px; }
+.touch .icon-btn { min-width: 44px; min-height: 44px; font-size: 26px; }
+.touch input[type=text], .touch input[type=number], .touch input[type=password], .touch input[type=search],
+.touch input[type=date], .touch input[type=month], .touch input[type=time], .touch select, .touch textarea { min-height: 44px; font-size: 16px; }
+.touch input[type=checkbox] { width: 22px; height: 22px; }
+.touch table.list td, .touch table.list th { padding: 12px; }
+.touch .modal-foot .btn { min-width: 100px; }
+.touch .chips .btn.small { min-height: 42px; }
+.touch .pin-pad button { padding: 18px 0; font-size: 22px; }
+/* 屏幕键盘（触摸模式） */
+.keypad { position: fixed; z-index: 400; background: #2b2824; padding: 8px; box-shadow: 0 12px 36px rgba(0,0,0,.35); user-select: none; }
+.keypad.kp-num { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); border-radius: 16px; width: calc(236px * var(--kp-scale, 1)); }
+.keypad.kp-abc, .keypad.kp-sym, .keypad.kp-acc { left: 50%; transform: translateX(-50%); bottom: env(safe-area-inset-bottom, 0px); border-radius: 16px 16px 0 0; width: min(calc(860px * var(--kp-scale, 1)), 100vw); }
+.keypad .kp-top { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-bottom: 6px; }
+.keypad .kp-hide { border: 0; background: none; color: #d8d2c8; font-size: 14px; padding: 2px 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
+.keypad .kp-hide-ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.keypad .kp-resize { cursor: ew-resize; color: #d8d2c8; font-size: 16px; padding: 2px 10px; touch-action: none; user-select: none; }
+.keypad .kp-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.keypad .kp-row:last-child { margin-bottom: 0; }
+.keypad .kp-row button { flex: 1; min-width: 0; height: calc(52px * var(--kp-scale, 1)); border: 0; border-radius: 10px; background: #474239; color: #fff; font-size: calc(22px * var(--kp-scale, 1)); cursor: pointer; }
+.keypad.kp-num .kp-row button { height: calc(56px * var(--kp-scale, 1)); font-size: calc(24px * var(--kp-scale, 1)); }
+.keypad .kp-row button:active { background: var(--accent); }
+.keypad .kp-fn { font-size: 16px !important; background: #3a362f !important; }
+.keypad .kp-fn.on { background: var(--accent) !important; }
+.keypad .kp-space { flex: 3 !important; }
+.keypad .kp-done { flex: 1.5 !important; background: var(--accent) !important; }
+.keypad-fab { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 399; width: 52px; height: 52px; border-radius: 50%; border: 0;
+  background: #2b2824; color: #fff; font-size: 24px; box-shadow: 0 6px 18px rgba(0,0,0,.3); cursor: pointer; }
+
+/* 门店 logo（设置 → 门店信息）：按 6:1 横条预览 */
+.logo-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 4px 0 14px; padding: 12px; border: 1px dashed var(--line, #ddd); border-radius: 12px; }
+.logo-prev { width: 300px; max-width: 100%; aspect-ratio: 6 / 1; border-radius: 8px; display: grid; place-items: center; overflow: hidden;
+  background: repeating-conic-gradient(#f3f0ea 0 25%, #fff 0 50%) 0 0 / 16px 16px; }
+.logo-prev img { width: 100%; height: 100%; object-fit: contain; }
+
+/* 刷卡机等待：大金额 + 转圈 */
+.tm-wait { text-align: center; padding: 10px 0 4px; }
+.tm-amt { font-size: 44px; font-weight: 800; color: var(--accent); }
+.tm-msg { margin-top: 10px; font-size: 16px; min-height: 1.6em; }
+.tm-msg .ok { color: var(--ok); font-size: 20px; }
+.tm-spin { display: inline-block; width: 16px; height: 16px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; vertical-align: -3px; animation: tmspin .8s linear infinite; }
+@keyframes tmspin { to { transform: rotate(360deg); } }
+
+/* 结账：一键收款（全部刷卡 / 现金刚好 / 全部餐券），点一下就收完 */
+/* 1.27：按钮（2 个或 3 个）始终排在同一行、平分宽度，字号随屏幕宽度缩放，窄屏手机上也不换行 */
+.quickpay { display: flex; gap: clamp(6px, 1.5vw, 10px); margin: 6px 0 4px; }
+.quickpay .btn { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: clamp(10px, 2vw, 14px) 4px; font-size: clamp(14px, 3.6vw, 18px); font-weight: 800; border-width: 2px; white-space: normal; text-align: center; line-height: 1.2; }
+.quickpay .btn small { font-size: clamp(11px, 2.6vw, 12px); font-weight: 500; opacity: .75; }
+.quickpay .qp-card { border-color: #2952c8; color: #2952c8; background: #eef2ff; }
+.quickpay .qp-cash { border-color: #13804f; color: #13804f; background: #e9f7ef; }
+.quickpay .qp-v { border-color: #b45309; color: #b45309; background: #fff7e6; }
+.quickpay .btn:hover { filter: brightness(.97); }
+/* 结账界面图标（表情换线条图标，颜色继承按钮/文字色，不改配色和位置） */
+.quickpay .btn .ic { width: 22px; height: 22px; }
+.receipt-opt .ic, .pay-grid .field span .ic, .tip-row .field span .ic { width: 15px; height: 15px; vertical-align: -2px; margin-right: 2px; }
+.quickpay .btn .ic, .receipt-opt .ic, .pay-grid .field span .ic, .tip-row .field span .ic { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.qp-or { font-size: 13px; margin: 12px 0 6px; }
+.vtypes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; font-size: 13px; }
+.vtypes .chip { border: 1px solid var(--line); background: var(--panel); border-radius: 99px; padding: 5px 11px; font-size: 13px; cursor: pointer; }
+.vtypes .chip.on { background: #b45309; border-color: #b45309; color: #fff; }
+
+/* 设置折叠：标题一排一排，点开才显示内容 */
+.section.foldable > h3 { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; border-radius: 12px; padding: 10px 14px; margin: 0 0 8px; background: var(--panel); border: 1px solid var(--line); transition: background .15s, border-color .15s; }
+.section.foldable > h3:hover { border-color: var(--accent); }
+.section.foldable > h3:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 1px; }
+.section.foldable > h3::after { content: ""; margin-left: auto; width: 9px; height: 9px; border-right: 2.5px solid var(--muted); border-bottom: 2.5px solid var(--muted); transform: rotate(45deg); transition: transform .2s; flex: none; }
+.section.foldable.folded > h3::after { transform: rotate(-45deg); }
+.section.foldable:not(.folded) > h3 { background: transparent; border-color: transparent; padding-left: 2px; }
+.section.foldable.folded > :not(h3) { display: none !important; }
+.section.foldable.folded { margin-bottom: 0; }
+.set-top .fold-all { white-space: nowrap; }
+
+/* 设置 → 支付方式：餐券种类、刷卡机连接 */
+.pay-sub { margin: 0 0 10px 26px; }
+.tm-form { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.tm-form[hidden], .tm-form [hidden] { display: none !important; }
+.tm-ip, .tm-com, .tm-row2 { display: flex; gap: 10px; flex-wrap: wrap; }
+.tm-ip .field, .tm-com .field { flex: 1; min-width: 140px; margin: 0; }
+.tm-row2 .field { margin: 8px 0 0; }
+
+/* ===================== v1.18 视觉优化（只改质感，不改布局和字重：1366 宽屏幕上按钮位置不变） ===================== */
+:root { --shadow-1: 0 1px 2px rgba(31, 29, 26, .06), 0 1px 1px rgba(31, 29, 26, .03); --shadow-2: 0 2px 6px rgba(31, 29, 26, .06), 0 14px 34px -14px rgba(31, 29, 26, .28); --ease: cubic-bezier(.2, .8, .2, 1); }
+/* 按钮：圆一点、按下有反馈、主按钮带一点光泽 */
+.btn { border-radius: 10px; transition: background-color .15s, border-color .15s, box-shadow .15s, transform .08s, filter .15s; }
+.btn:hover:not(:disabled) { border-color: #bdb6aa; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn.primary { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 4px 12px -6px var(--accent); }
+.btn.primary:hover:not(:disabled) { border-color: var(--accent); filter: brightness(1.06); }
+.btn.danger:hover:not(:disabled) { background: #fff5f4; border-color: var(--danger); }
+/* 键盘操作看得清焦点（鼠标点击不显示） */
+.btn:focus-visible, .seg button:focus-visible, .nav button:focus-visible, select:focus-visible, [role="button"]:focus-visible, .icon-btn:focus-visible, .chips button:focus-visible, .pin-pad button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+input[type=text], input[type=number], input[type=password], input[type=date], input[type=month], input[type=search], input[type=tel], select, textarea { transition: border-color .15s, box-shadow .15s; }
+input[type=text]:focus, input[type=number]:focus, input[type=password]:focus, input[type=date]:focus, input[type=month]:focus, input[type=search]:focus, input[type=tel]:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+/* 分段按钮 */
+.seg { border-radius: 10px; background: #fff; box-shadow: var(--shadow-1); }
+.seg button { transition: background-color .15s, color .15s; }
+.seg button:hover:not(.on) { background: #f7f5f1; }
+/* 弹窗：大圆角、背景轻微模糊、弹出动画、底栏浅底色 */
+.modal-overlay { -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); animation: posFade .15s ease-out both; }
+.modal { border-radius: 18px; box-shadow: 0 2px 8px rgba(0, 0, 0, .08), 0 30px 70px -20px rgba(0, 0, 0, .4); animation: posPop .2s var(--ease) both; }
+.modal-head { padding: 16px 20px; }
+.modal-head h3 { font-size: 18px; letter-spacing: -.01em; }
+.modal-body { padding: 18px 20px; }
+.modal-foot { padding: 12px 20px; background: #faf8f5; border-radius: 0 0 18px 18px; }
+@keyframes posFade { from { opacity: 0; } }
+@keyframes posPop { from { opacity: 0; transform: translateY(8px) scale(.985); } }
+/* 提示条：圆角 + 从上面滑下来 */
+.toast { border-radius: 12px; padding: 11px 18px; box-shadow: 0 10px 30px -8px rgba(0, 0, 0, .35); animation: posToast .22s var(--ease) both; }
+@keyframes posToast { from { opacity: 0; transform: translateY(-8px); } }
+/* 顶栏导航：当前页下面一条主题色 */
+.nav button { transition: background-color .15s, color .15s; }
+.nav button:hover:not(.on) { color: #fff; background: rgba(255, 255, 255, .07); }
+.nav button.on { box-shadow: inset 0 -3px 0 var(--accent); }
+/* 卡片 */
+.card { box-shadow: var(--shadow-1); }
+.badge { font-weight: 600; }
+/* 滚动条细一点（Windows 默认的太粗） */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #d5cfc4; border-radius: 99px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: #bdb5a8; }
+::-webkit-scrollbar-track { background: transparent; }
+@media (prefers-reduced-motion: reduce) { .modal, .modal-overlay, .toast { animation: none; } *, *::before, *::after { transition-duration: 0s !important; scroll-behavior: auto !important; } }
+
+/* Gway 卡片：本店活动、本店优惠码 */
+.gw-promo { margin: 0 0 10px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 12px; }
+.sc-form { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+/* 超市 / 百货收银：浮动键盘（数字、全键盘）放左下角，不挡右边收款面板和「打印小票」那一栏 */
+/* 培训模式：顶栏下面一条醒目的提示 */
+.training-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 16px; background: repeating-linear-gradient(-45deg, #fde68a 0 14px, #fcd34d 14px 28px); color: #78350f; font-size: 14px; }
+.training-bar[hidden] { display: none; }
+.training-bar .btn { margin-left: auto; }
+/* 合规声明 */
+.fz-sum { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; border-left: 4px solid var(--ok); }
+.fz-sum.fz-bad { border-left-color: var(--danger); }
+.fz-sum > div:first-child { flex: 1 1 260px; display: grid; gap: 2px; }
+.fz-sum .muted { font-size: 13px; }
+.fz-cert { flex: 1 1 260px; font-size: 14px; }
+.fz-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 12px 0; }
+.fz-grid .card { margin: 0; }
+.fz-grid p { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.fz-train { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.fz-train > div { flex: 1 1 320px; }
+.fz-train p { margin: 4px 0 0; font-size: 13px; }
+.fz-arch { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.fz-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 12px; margin: 8px 0 10px; }
+html.retail-mode .keypad.kp-num { right: auto; left: 16px; }
+html.retail-mode .keypad.kp-abc, html.retail-mode .keypad.kp-sym, html.retail-mode .keypad.kp-acc { left: 12px; transform: none; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); border-radius: 16px; width: min(calc(820px * var(--kp-scale, 1)), calc(100vw - 372px)); }
+html.retail-mode .keypad-fab { right: auto; left: 16px; }
+/* B28 / B56：浮动 ⌨ 按钮显示时，弹窗底栏在按钮那一边留 76px（按钮 52 + 边距），不盖住主按钮 */
+html.kp-fab-on .modal-foot { padding-right: 76px; }
+html.retail-mode.kp-fab-on .modal-foot { padding-right: 20px; padding-left: 76px; }
+@media (max-width: 900px) { html.retail-mode .keypad.kp-abc, html.retail-mode .keypad.kp-sym, html.retail-mode .keypad.kp-acc { width: calc(100vw - 24px); } }
+
+/* 商城 logo 预览：圆形（和商城上一样） */
+.logo-prev.round { width: 72px; height: 72px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: #fff; border: 1px solid var(--line); flex: none; }
+.logo-prev.round img { width: 100%; height: 100%; object-fit: cover; }
+
+/* 来单提醒：音量 / 提示音 / 语速 / 音调滑杆 */
+.vc-sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px 18px; margin: 10px 0 2px; }
+.vc-sliders input[type=range] { width: 100%; }
+
+/* 顾客评价（Gway 商城） */
+.rv-head { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.rv-avg { display: flex; align-items: baseline; gap: 8px; }
+.rv-avg b { font-size: 30px; letter-spacing: -.02em; }
+.rv-stars { color: #f5a524; letter-spacing: 1px; }
+.rv-list { display: grid; gap: 10px; }
+.rv-item { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fff; }
+.rv-item.hidden-rv { opacity: .6; }
+.rv-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13.5px; }
+.rv-text { margin: 6px 0 0; font-size: 14px; white-space: pre-wrap; }
+.rv-reply { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 8%, #fff); font-size: 13.5px; }
+.rv-act { display: flex; gap: 8px; margin-top: 8px; }
+
+/* 🛒 Gway 商城展示：卡片预览 + 三种图 */
+.ml-wrap { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 20px; align-items: start; }
+@media (max-width: 760px) { .ml-wrap { grid-template-columns: 1fr; } }
+.ml-card { border-radius: 22px; overflow: hidden; background: #fff; border: 1px solid var(--line); box-shadow: 0 14px 30px -20px rgba(0,0,0,.45); }
+.ml-cover { position: relative; aspect-ratio: 16 / 10; background: linear-gradient(135deg, #e3f4df, #c6e8bd); display: grid; place-items: center; overflow: hidden; }
+.ml-cover > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ml-ph { font-size: 54px; font-weight: 800; color: #0c3b2c; opacity: .5; }
+.ml-avatar { position: absolute; left: 10px; bottom: 10px; width: 52px; height: 52px; border-radius: 50%; overflow: hidden; background: #fff; border: 3px solid #fff; box-shadow: 0 6px 16px rgba(0,0,0,.28); }
+.ml-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ml-strip { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 38px; border-radius: 10px; background: rgba(255,255,255,.94); display: grid; place-items: center; padding: 4px 10px; }
+.ml-strip img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.ml-open { position: absolute; left: 10px; top: 10px; background: #fff; color: #15803d; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 3px 9px; }
+.ml-body { padding: 10px 14px 14px; display: grid; gap: 2px; }
+.ml-body b { font-size: 17px; }
+.ml-rows { display: grid; gap: 12px; }
+.ml-row { display: flex; gap: 14px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.ml-thumb { flex: none; width: 96px; height: 60px; border-radius: 10px; overflow: hidden; background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 0 0 / 12px 12px; display: grid; place-items: center; border: 1px solid var(--line); }
+.ml-thumb.round { width: 60px; border-radius: 50%; margin: 0 18px; }
+.ml-thumb.strip { height: 24px; margin-top: 18px; }
+.ml-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ml-thumb.strip img { object-fit: contain; }
+.ml-txt { display: grid; gap: 4px; min-width: 0; font-size: 13px; }
+.ml-txt b { font-size: 14.5px; }
+.ml-state { font-size: 12.5px; color: #92400e; }
+.ml-state.ok { color: #15803d; }
+.ml-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+/* 裁剪弹窗 */
+.cr-frame { position: relative; width: min(640px, 100%); margin: 0 auto; overflow: hidden; border-radius: 14px; background: repeating-conic-gradient(#e5e5e5 0 25%, #fff 0 50%) 0 0 / 16px 16px; cursor: grab; touch-action: none; user-select: none; }
+.cr-frame.round { width: min(360px, 100%); border-radius: 50%; }
+.cr-frame:active { cursor: grabbing; }
+.cr-frame img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; pointer-events: none; }
+.cr-tools { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
+.cr-tools input[type=range] { width: min(320px, 70%); }
+
+/* 供应商通知（授权管理发的） */
+.notice-banner { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #eef4ff; color: #1e3a8a; border-bottom: 1px solid #c7d7fe; font-size: 14px; }
+.notice-banner.warn { background: #fff7e6; color: #7c3d00; border-color: #fcd9a6; }
+.notice-banner.hidden { display: none; }
+.notice-banner .nb-ic { font-size: 18px; }
+.notice-banner .nb-tx { flex: 1; display: grid; gap: 2px; white-space: pre-line; }
+
+/* 屏幕键盘：拖动条、拖过的位置、自动换边 */
+.keypad .kp-top { justify-content: space-between; align-items: center; }
+.keypad .kp-grip { flex: 1; cursor: grab; color: #9f988c; font-size: 18px; letter-spacing: 2px; padding: 2px 8px; touch-action: none; user-select: none; }
+.keypad .kp-grip:active { cursor: grabbing; color: #fff; }
+.keypad.kp-moved { right: auto !important; bottom: auto !important; transform: none !important; border-radius: 16px !important; }
+.keypad.kp-num.kp-swap { right: auto; left: 16px; }
+html.retail-mode .keypad.kp-num.kp-swap { left: auto; right: 16px; }
+/* 窄屏（平板竖屏 / 手机，整改 U1）：屏幕键盘固定贴底、铺满宽度，不能拖；弹窗让到键盘上面（common.js 给遮罩加 kp-open 和键盘高度 --kp-h） */
+@media (max-width: 820px) {
+  .keypad, .keypad.kp-num { left: 0 !important; right: 0 !important; top: auto !important; bottom: 0 !important; transform: none !important; width: auto !important;
+    border-radius: 16px 16px 0 0 !important; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .keypad .kp-grip { visibility: hidden; }
+}
+/* 弹窗让到屏幕键盘上面（窄屏，或平板横屏的字母键盘，B57）：common.js 给遮罩加 kp-open 和键盘高度 --kp-h */
+.modal-overlay.kp-open { padding-bottom: calc(var(--kp-h, 0px) + 8px); }
+.modal-overlay.kp-open .modal { max-height: calc(100vh - var(--kp-h, 0px) - 24px); }
+@supports (height: 100dvh) { .modal-overlay.kp-open .modal, .modal-overlay.kp-open .modal.wide { max-height: calc(100dvh - var(--kp-h, 0px) - 24px); } }
+
+/* 全屏按钮（手机、平板用 IP 打开时才有，见 common.js 的 PosFullscreen）：没有放按钮位置的页面浮在左下角 */
+.fs-btn { white-space: nowrap; }
+.fs-btn .fs-txt { margin-left: 4px; }
+@media (max-width: 480px) { .fs-btn:not(.fs-float) .fs-txt { display: none; } } /* 手机顶栏放不下：只留图标 */
+.fs-float { position: fixed; left: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 398; opacity: .88; box-shadow: 0 4px 14px -6px rgba(0,0,0,.4); }
+@media print { .fs-btn { display: none !important; } }
+
+/* 报表（reports-view.js）：收银台「报表」页和老板手机页共用 */
+/* 页面美化（10-11）：最后一排不留空位（5 + 2 时最后两张拉宽） */
+.kpis { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.kpis > * { flex: 1 1 160px; }
+.kpi .l { color: var(--muted); font-size: 13px; }
+.kpi .v { font-size: 26px; font-weight: 700; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px; margin-bottom: 16px; }
+.grid2 h3 { font-size: 16px; margin-bottom: 8px; }
+.rp-range { display: inline-flex; gap: 6px; align-items: center; }
+.pct { display: flex; align-items: center; gap: 8px; }
+.pct .bar { height: 8px; min-width: 1px; }
+.pct span { font-size: 12px; color: var(--muted); }
+.items-report .cat-row td { background: var(--cb, #faf9f7); font-weight: 700; }
+.items-report .cat-row td:first-child { box-shadow: inset 4px 0 0 var(--cc, transparent); }
+.items-report .rank { color: var(--muted); width: 48px; }
+.cat-legend { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.rp-charts { margin-bottom: 16px; }
+.rp-charts .card h3 { font-size: 16px; margin-bottom: 10px; }
+.hour-chart { display: flex; align-items: flex-end; gap: 4px; height: 180px; padding-top: 18px; }
+.hc-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; position: relative; }
+.hc-col i { display: block; width: 100%; max-width: 34px; background: var(--accent-soft); border: 1px solid var(--accent); border-bottom: 0; border-radius: 6px 6px 0 0; min-height: 1px; }
+.hc-col.peak i { background: var(--accent); }
+.hc-col .hc-v { font-size: 11px; line-height: 14px; margin-bottom: 2px; color: var(--muted); white-space: nowrap; overflow: hidden; max-width: 100%; }
+.hc-col .hc-h { font-size: 12px; color: var(--muted); margin-top: 3px; }
+/* 热销前 10：名次自己画（li 是 grid，浏览器的列表序号不显示，以前左边空着一块） */
+.top-list { margin: 0; padding-left: 0; display: grid; gap: 6px; font-size: 14px; counter-reset: top; }
+.top-list li { display: grid; grid-template-columns: 1.6em minmax(80px, 1.2fr) 2fr auto auto; gap: 8px; align-items: center; counter-increment: top; }
+.top-list li::before { content: counter(top); color: var(--muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.top-list .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top-list .nm .i18n-2 { display: block; margin: 0; overflow: hidden; text-overflow: ellipsis; } /* 双语：菜名译文放第二行，太长用 … */
+.top-list .bar-wrap { height: 8px; background: #f0ede8; border-radius: 4px; overflow: hidden; }
+.top-list .bar-wrap i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.items-report tr.clickable { cursor: pointer; }
+.items-report tr.clickable:hover td { background: #fdf8f4; }
+.items-report .opt-row td { color: var(--muted); font-size: 13px; padding-top: 5px; padding-bottom: 5px; }
+.items-report tfoot td { font-weight: 600; background: #faf9f7; }
+.items-report tfoot .grand-row td { color: var(--accent); font-size: 16px; }
+table.matrix td, table.matrix th { padding: 6px 8px; }
+.bar { height: 10px; background: var(--accent); border-radius: 3px; }
+
+/* ---------- 页面美化第二批（10-11）：统一观感 ---------- */
+/* 复选框、单选、滑块用店里的主题色（以前是浏览器默认的蓝色）；老浏览器不认就照旧 */
+input[type=checkbox], input[type=radio], input[type=range] { accent-color: var(--accent); }
+/* 复选框和文字对齐 */
+label > input[type=checkbox], label > input[type=radio] { vertical-align: -.15em; }
+/* 做成按钮样子的链接：不要下划线 */
+a.btn { text-decoration: none; }
+textarea { width: 100%; box-sizing: border-box; }
+@media (max-width: 600px) {
+  .rp-range { display: flex; width: 100%; }
+  .rp-range input { flex: 1; min-width: 0; }
+}
+
+/* 统一观感（10-11，按上面 v1.24 设计规范）：
+   同一行里跟在输入框 / 下拉框后面的小按钮和它一样高（以前输入框 44、按钮 40 或 34，高低不齐） */
+input ~ .btn.small, select ~ .btn.small, select ~ .tb-toggle { align-self: stretch; }
+.touch input ~ .btn.small, .touch select ~ .btn.small, .touch select ~ .tb-toggle { min-height: 44px; }
+/* 小标题一律 16px（以前 15 / 16 / 16.4 混着；单写 h3 优先级最低，弹窗标题等另有规定的不受影响） */
+h3 { font-size: 16px; }
+.card > h3, .section > h3 { font-size: 16px; }
+/* 设置页的卡片内容是后来填的：还没填好时不显示空白框（慢电脑、安卓平板上会先闪一排空框） */
+.section > .card:empty { display: none; }
+/* 手机上（≤600）：几个字长的切换按钮（刷卡机连接方式、二维码网络方式）竖着排，每个一行，不挤成三行 */
+@media (max-width: 600px) {
+  .seg.seg-stack { display: flex; flex-direction: column; width: 100%; }
+  .seg.seg-stack button + button { border-left: 0; border-top: 1px solid var(--line); }
+  /* 弹窗底部按钮：放不下就换行，每个按钮至少占半行 */
+  .modal-foot { flex-wrap: wrap; }
+  .modal-foot .btn { flex: 1 1 40%; white-space: normal; }
+}
+/* B46：平板竖屏 / 手机超市模式：打印机按钮在底部导航最左边，左下的 ⌨ 浮动按钮挪到导航栏上面，不叠在一起 */
+@media (max-width: 820px) { html.retail-mode.pos-fab-nav .keypad-fab { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); } }
